@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.env
+*.env.local
+.pnpm-store/
+pnpm-lock.yaml
+
+# Prisma
+prisma/migrations/*.sql.bak
+
+# Playwright
+playwright-report/
+test-results/
+
+# IDE
+.vscode/
+.idea/
