@@ -1,9 +1,5 @@
 import { setPeer, getPeer } from "./cleanup.js";
 
-const ICE_SERVERS: RTCIceServer[] = [
-  { urls: "stun:stun.l.google.com:19302" },
-];
-
 // Buffer candidates that arrive before setRemoteDescription
 const iceCandidateQueue = new Map<string, RTCIceCandidateInit[]>();
 
@@ -13,10 +9,11 @@ type OnRemoteStream = (peerId: string, stream: MediaStream) => void;
 function createPc(
   peerId: string,
   localStream: MediaStream,
+  iceServers: RTCIceServer[],
   sendSignal: SendSignal,
   onRemoteStream: OnRemoteStream,
 ): RTCPeerConnection {
-  const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+  const pc = new RTCPeerConnection({ iceServers });
 
   localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
 
@@ -28,6 +25,27 @@ function createPc(
 
   pc.ontrack = (event) => {
     if (event.streams[0]) onRemoteStream(peerId, event.streams[0]);
+  };
+
+  pc.oniceconnectionstatechange = () => {
+    console.log(`[ICE ${peerId}] state: ${pc.iceConnectionState}`);
+    if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+      pc.getStats().then((stats) => {
+        stats.forEach((report) => {
+          if (report.type === "candidate-pair") {
+            const pair = report as RTCIceCandidatePairStats;
+            if (pair.state === "succeeded") {
+              console.log(`[ICE ${peerId}] selected pair:`, pair);
+            }
+          }
+          if (report.type === "remote-candidate") {
+            const candidateType = (report as { candidateType?: string }).candidateType;
+            console.log(`[ICE ${peerId}] remote candidate type: ${candidateType}`);
+            // host | srflx | relay — relay이면 TURN 경유
+          }
+        });
+      }).catch(console.warn);
+    }
   };
 
   setPeer(peerId, pc);
@@ -45,10 +63,11 @@ async function flushCandidateQueue(peerId: string, pc: RTCPeerConnection): Promi
 export async function initPeerAsOfferer(
   peerId: string,
   localStream: MediaStream,
+  iceServers: RTCIceServer[],
   sendSignal: SendSignal,
   onRemoteStream: OnRemoteStream,
 ): Promise<void> {
-  const pc = createPc(peerId, localStream, sendSignal, onRemoteStream);
+  const pc = createPc(peerId, localStream, iceServers, sendSignal, onRemoteStream);
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
   sendSignal("webrtc-offer", { to: peerId, sdp: { type: offer.type, sdp: offer.sdp } });
@@ -57,11 +76,12 @@ export async function initPeerAsOfferer(
 export async function initPeerAsAnswerer(
   peerId: string,
   localStream: MediaStream,
+  iceServers: RTCIceServer[],
   offer: RTCSessionDescriptionInit,
   sendSignal: SendSignal,
   onRemoteStream: OnRemoteStream,
 ): Promise<void> {
-  const pc = createPc(peerId, localStream, sendSignal, onRemoteStream);
+  const pc = createPc(peerId, localStream, iceServers, sendSignal, onRemoteStream);
   await pc.setRemoteDescription(offer);
   await flushCandidateQueue(peerId, pc);
 

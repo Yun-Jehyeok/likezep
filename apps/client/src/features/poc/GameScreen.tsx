@@ -8,6 +8,7 @@ import {
   handleAnswer,
   handleIceCandidate,
 } from "../../core/webrtc/peerManager.js";
+import { getIceServers } from "../../core/webrtc/iceServers.js";
 import { cleanupAllPeers, cleanupPeer } from "../../core/webrtc/cleanup.js";
 import { GameCanvas } from "./GameCanvas.js";
 import { VideoGrid } from "./VideoGrid.js";
@@ -24,7 +25,10 @@ export function GameScreen({ playerName }: Props) {
     let active = true;
 
     async function setup() {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const [stream, iceServers] = await Promise.all([
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true }),
+        getIceServers(),
+      ]);
       if (!active) {
         stream.getTracks().forEach((t) => t.stop());
         return;
@@ -47,7 +51,7 @@ export function GameScreen({ playerName }: Props) {
         onProximityConnect(peerId, isOfferer) {
           if (!localStreamRef.current) return;
           if (isOfferer) {
-            initPeerAsOfferer(peerId, localStreamRef.current, sendSignal, onRemoteStream);
+            initPeerAsOfferer(peerId, localStreamRef.current, iceServers, sendSignal, onRemoteStream);
           }
           // answerer waits for webrtc-offer to arrive
         },
@@ -57,7 +61,7 @@ export function GameScreen({ playerName }: Props) {
         },
         onWebRtcOffer(from, sdp) {
           if (!localStreamRef.current) return;
-          initPeerAsAnswerer(from, localStreamRef.current, sdp, sendSignal, onRemoteStream);
+          initPeerAsAnswerer(from, localStreamRef.current, iceServers, sdp, sendSignal, onRemoteStream);
         },
         onWebRtcAnswer(from, sdp) {
           handleAnswer(from, sdp);

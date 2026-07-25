@@ -1,0 +1,30 @@
+# coturn 설정 예시 — 실제 값으로 교체 후 /etc/turnserver.conf 에 복사
+# static-auth-secret 은 절대 커밋하지 않는다. EC2 인스턴스에서만 관리.
+
+# 리스닝 포트
+listening-port=3478
+
+# EC2 IP 설정 — 없으면 사설 IP로만 바인딩돼 외부에서 relay 불가 (가장 흔한 실패 지점)
+external-ip=<EC2_PUBLIC_IP>/<EC2_PRIVATE_IP>
+
+# WebRTC 호환성
+fingerprint
+
+# 시간 제한 credential (HMAC-SHA1 REST API 방식)
+use-auth-secret
+static-auth-secret=<openssl rand -hex 32 으로 생성한 값>
+
+# realm: 도메인 또는 식별 문자열
+realm=mentoring.likezep.local
+
+# relay 포트 범위 — EC2 보안그룹의 인바운드 UDP 49152-65535 와 반드시 일치
+min-port=49152
+max-port=65535
+
+# 보안 강화
+no-loopback-peers
+no-multicast-peers
+stale-nonce=600
+
+# 동시 할당 상한
+total-quota=100
