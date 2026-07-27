@@ -6,6 +6,8 @@ import { ProximityRoom } from "./rooms/ProximityRoom.js";
 import { generateTurnCredentials } from "./turn/credentials.js";
 import { mediasoupRouter } from "./mediasoup/index.js";
 import { getWorker } from "./mediasoup/worker.js";
+import { authRouter } from "./api/auth.js";
+import { config } from "./config.js";
 
 const app = express();
 app.use(express.json());
@@ -16,14 +18,13 @@ app.use((_req, res, next) => {
   next();
 });
 app.options("*", (_req, res) => res.sendStatus(204));
+
 app.get("/health", (_req, res) => res.json({ ok: true }));
+app.use("/api/auth", authRouter);
 app.use("/ms", mediasoupRouter);
 
 app.get("/turn-credentials", (_req, res) => {
-  const secret = process.env.TURN_SECRET;
-  const host = process.env.TURN_HOST;
-  const port = Number(process.env.TURN_PORT ?? 3478);
-  const ttl = Number(process.env.TURN_TTL ?? 86400);
+  const { TURN_SECRET: secret, TURN_HOST: host, TURN_PORT: port, TURN_TTL: ttl } = config;
 
   if (!secret || !host) {
     return res.json({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
@@ -46,8 +47,7 @@ const gameServer = new Server({
 
 gameServer.define("poc-room", ProximityRoom);
 
-const PORT = Number(process.env.PORT ?? 2567);
-gameServer.listen(PORT).then(async () => {
-  console.log(`[server] http://localhost:${PORT}`);
+gameServer.listen(config.PORT).then(async () => {
+  console.log(`[server] http://localhost:${config.PORT}`);
   await getWorker();
 });

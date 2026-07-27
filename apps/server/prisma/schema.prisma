@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  mentor
+  mentee
+}
+
+enum RoomType {
+  public
+  private
+}
+
+enum EventType {
+  join
+  leave
+}
+
+model User {
+  id          String    @id @default(uuid()) @db.Uuid
+  googleId    String    @unique @map("google_id") @db.VarChar
+  email       String    @unique @db.VarChar
+  name        String    @db.VarChar
+  role        Role      @default(mentee)
+  groupId     String?   @map("group_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz
+
+  group        Group?        @relation(fields: [groupId], references: [id])
+  chatMessages ChatMessage[]
+  accessLogs   AccessLog[]
+
+  @@index([groupId])
+  @@map("users")
+}
+
+model Group {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique @db.VarChar
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  users User[]
+  rooms Room[]
+
+  @@map("groups")
+}
+
+model Room {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar
+  type      RoomType
+  groupId   String?  @unique @map("group_id") @db.Uuid
+  mapKey    String   @default("default") @map("map_key") @db.VarChar
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  group        Group?        @relation(fields: [groupId], references: [id])
+  chatMessages ChatMessage[]
+  accessLogs   AccessLog[]
+
+  @@index([type])
+  @@map("rooms")
+}
+
+model ChatMessage {
+  id        BigInt   @id @default(autoincrement())
+  roomId    String   @map("room_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  content   String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  room Room @relation(fields: [roomId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([roomId, createdAt(sort: Desc)])
+  @@map("chat_messages")
+}
+
+model AccessLog {
+  id        BigInt    @id @default(autoincrement())
+  userId    String    @map("user_id") @db.Uuid
+  roomId    String    @map("room_id") @db.Uuid
+  event     EventType
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id])
+  room Room @relation(fields: [roomId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([roomId, createdAt])
+  @@map("access_logs")
+}

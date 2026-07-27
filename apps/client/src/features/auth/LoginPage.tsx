@@ -1,6 +1,10 @@
 import { useNavigate } from "react-router-dom";
+import { useGoogleLogin } from "@react-oauth/google";
+import { useState } from "react";
 import { useAuthStore } from "../../app/store.js";
+import { api } from "../../core/api/client.js";
 
+// TODO: Phase 1 완료 후 제거
 const MOCK_USERS = [
   { id: "u1", name: "관리자", email: "admin@test.com", role: "admin" as const, groupId: null },
   { id: "u2", name: "멘토 김", email: "mentor@test.com", role: "mentor" as const, groupId: null },
@@ -14,17 +18,47 @@ const ROLE_LABEL: Record<string, string> = {
   mentee: "멘티",
 };
 
+interface AuthResponse {
+  token: string;
+  user: { id: string; name: string; email: string; role: "admin" | "mentor" | "mentee"; groupId: string | null };
+}
+
 export function LoginPage() {
   const setAuth = useAuthStore((s) => s.setAuth);
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function mockLogin(user: typeof MOCK_USERS[0]) {
-    setAuth(user, "mock-token");
+  function handleAuthSuccess(user: AuthResponse["user"], token: string) {
+    sessionStorage.setItem("auth_token", token);
+    setAuth(user, token);
     if (user.role === "mentee" && !user.groupId) {
       navigate("/waiting");
     } else {
       navigate("/lobby");
     }
+  }
+
+  const googleLogin = useGoogleLogin({
+    flow: "auth-code",
+    onSuccess: async ({ code }) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await api.post<AuthResponse>("/api/auth/google", { code });
+        handleAuthSuccess(res.user, res.token);
+      } catch (err) {
+        setError("Google 로그인에 실패했습니다. 다시 시도해 주세요.");
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    onError: () => setError("Google 로그인이 취소됐습니다."),
+  });
+
+  function mockLogin(user: typeof MOCK_USERS[0]) {
+    handleAuthSuccess(user, "mock-token");
   }
 
   return (
@@ -47,11 +81,22 @@ export function LoginPage() {
 
           {/* Google 로그인 */}
           <div className="px-8 pt-8 pb-6">
+            {error && (
+              <div className="mb-4 px-3 py-2.5 rounded-xl bg-[#fff1f0] border border-[#ffd6d3] text-[#e03131] text-sm">
+                {error}
+              </div>
+            )}
             <button
               type="button"
-              className="w-full h-12 flex items-center justify-center gap-3 rounded-xl border border-[#e4e4e4] bg-white text-[#17171b] text-[15px] font-medium hover:bg-[#f9f9f9] active:bg-[#f2f2f2] transition-colors"
+              onClick={() => googleLogin()}
+              disabled={loading}
+              className="w-full h-12 flex items-center justify-center gap-3 rounded-xl border border-[#e4e4e4] bg-white text-[#17171b] text-[15px] font-medium hover:bg-[#f9f9f9] active:bg-[#f2f2f2] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <GoogleIcon />
+              {loading ? (
+                <span className="w-5 h-5 border-2 border-[#e4e4e4] border-t-[#0071ff] rounded-full animate-spin" />
+              ) : (
+                <GoogleIcon />
+              )}
               Google로 계속하기
             </button>
           </div>
