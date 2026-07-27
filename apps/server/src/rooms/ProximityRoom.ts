@@ -12,6 +12,7 @@ const DISCONNECT_THRESHOLD = 180;
 
 export class ProximityRoom extends Room<ProximityRoomState> {
   private connectedPairs = new Set<string>(); // "a:b" where a < b
+  private currentShare: { producerId: string; presenterId: string } | null = null;
 
   onCreate() {
     this.maxClients = 20;
@@ -53,16 +54,13 @@ export class ProximityRoom extends Room<ProximityRoomState> {
     });
 
     this.onMessage("screenshare-start", (client: Client, payload: { producerId: string }) => {
-      this.broadcast("screenshare-started", {
-        producerId: payload.producerId,
-        presenterId: client.sessionId,
-      }, { except: client });
+      this.currentShare = { producerId: payload.producerId, presenterId: client.sessionId };
+      this.broadcast("screenshare-started", this.currentShare, { except: client });
     });
 
     this.onMessage("screenshare-stop", (client: Client) => {
-      this.broadcast("screenshare-stopped", {
-        presenterId: client.sessionId,
-      }, { except: client });
+      this.currentShare = null;
+      this.broadcast("screenshare-stopped", { presenterId: client.sessionId }, { except: client });
     });
   }
 
@@ -73,9 +71,18 @@ export class ProximityRoom extends Room<ProximityRoomState> {
     player.x = 400 + (Math.random() * 100 - 50);
     player.y = 300 + (Math.random() * 100 - 50);
     this.state.players.set(client.sessionId, player);
+
+    if (this.currentShare) {
+      client.send("screenshare-started", this.currentShare);
+    }
   }
 
   onLeave(client: Client) {
+    if (this.currentShare?.presenterId === client.sessionId) {
+      this.currentShare = null;
+      this.broadcast("screenshare-stopped", { presenterId: client.sessionId });
+    }
+
     const id = client.sessionId;
     const toRemove: string[] = [];
 
