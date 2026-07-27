@@ -22,8 +22,8 @@ export class ProximityRoom extends Room<ProximityRoomState> {
   private dbRoomId = "";
   private userNames = new Map<string, string>(); // sessionId → display name
 
-  onCreate(options: { roomId?: string }) {
-    this.dbRoomId = options.roomId ?? "";
+  onCreate(options: { dbRoomId?: string }) {
+    this.dbRoomId = options.dbRoomId ?? "";
     this.maxClients = 20;
     this.setState(new ProximityRoomState());
     this.setMetadata({ roomId: this.dbRoomId });
@@ -89,14 +89,14 @@ export class ProximityRoom extends Room<ProximityRoomState> {
     });
   }
 
-  async onAuth(_client: Client, options: { token?: string; roomId?: string }) {
-    const { token, roomId } = options;
+  async onAuth(_client: Client, options: { token?: string; dbRoomId?: string }) {
+    const { token, dbRoomId } = options;
     if (!token) throw new Error("Token required");
 
     const payload = jwt.verify(token, config.JWT_SECRET) as AuthPayload;
 
-    if (roomId) {
-      const room = await findRoomById(roomId);
+    if (dbRoomId) {
+      const room = await findRoomById(dbRoomId);
       if (!room) throw new Error("Room not found");
       if (room.type === "private" && payload.role === "mentee" && payload.groupId !== room.groupId) {
         throw new Error("Access denied");

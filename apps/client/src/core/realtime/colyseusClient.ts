@@ -70,7 +70,7 @@ export async function joinRoom(
 ): Promise<Room> {
   const client = new Client(WS_URL);
   const room = await client.joinOrCreate("mentoring-room", {
-    roomId: dbRoomId,
+    dbRoomId,
     token,
     name: playerName,
   });

@@ -13,6 +13,9 @@ import {
   handleIceCandidate,
 } from "../../core/webrtc/peerManager.js";
 import { cleanupPeer, cleanupAllPeers } from "../../core/webrtc/cleanup.js";
+import { useScreenShare } from "../screenshare/useScreenShare.js";
+import { ScreenShareOverlay } from "./ScreenShareOverlay.js";
+import { RoomSwitcher } from "./RoomSwitcher.js";
 
 interface ChatMessage {
   id?: string;
@@ -43,6 +46,9 @@ export function RoomPage() {
   const [connError, setConnError] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [remotePeers, setRemotePeers] = useState<Record<string, RemotePeer>>({});
+  const [colyseusRoom, setColyseusRoom] = useState<Room | null>(null);
+
+  const { isSharing, startShare, stopShare, screenStream } = useScreenShare(colyseusRoom);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const roomRef = useRef<Room | null>(null);
@@ -63,6 +69,10 @@ export function RoomPage() {
 
   useEffect(() => {
     if (!roomId || !token || !user || !canvasRef.current) return;
+
+    setOccupants(0);
+    setMessages([]);
+    setRemotePeers({});
 
     let cancelled = false;
     const canvas = canvasRef.current;
@@ -98,8 +108,9 @@ export function RoomPage() {
         }
       },
       onPlayerLeave: (sessionId) => {
-        setOccupants((n) => Math.max(0, n - 1));
+        if (!playerNamesRef.current.has(sessionId)) return;
         playerNamesRef.current.delete(sessionId);
+        setOccupants((n) => Math.max(0, n - 1));
         gameRef.current?.removePlayer(sessionId);
         cleanupPeer(sessionId);
         setRemotePeers((prev) => {
@@ -145,6 +156,7 @@ export function RoomPage() {
         if (cancelled) { room.leave(); return; }
         roomRef.current = room;
         roomSendRef.current = (type, payload) => room.send(type, payload);
+        setColyseusRoom(room);
 
         // Listen to chat messages
         room.onMessage<ChatMessage>("chat", (msg) => {
@@ -170,6 +182,7 @@ export function RoomPage() {
 
     return () => {
       cancelled = true;
+      setColyseusRoom(null);
       cleanupAllPeers();
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
@@ -181,6 +194,7 @@ export function RoomPage() {
   }, [roomId, token, user]);
 
   function handleLeave() {
+    setColyseusRoom(null);
     cleanupAllPeers();
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
@@ -269,11 +283,7 @@ export function RoomPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {isPresenter && (
-            <button type="button" className="h-8 px-3 text-sm font-medium text-[#767676] border border-[#e4e4e4] rounded-lg hover:border-[#0071ff] hover:text-[#0071ff] transition-colors">
-              방 전환
-            </button>
-          )}
+          {isPresenter && roomId && <RoomSwitcher currentRoomId={roomId} />}
           <button
             type="button"
             onClick={() => setChatOpen((o) => !o)}
@@ -291,7 +301,7 @@ export function RoomPage() {
 
         {/* 게임 캔버스 */}
         <div className="flex-1 relative">
-          <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+          <canvas key={roomId} ref={canvasRef} className="absolute inset-0 w-full h-full" />
 
           {connError && (
             <div className="absolute inset-0 flex items-center justify-center bg-[#12121a]">
@@ -311,16 +321,37 @@ export function RoomPage() {
             </div>
           )}
 
-          {/* 화면공유 (Phase 5) */}
+          {/* 화면공유 오버레이 */}
+          {screenStream && <ScreenShareOverlay stream={screenStream} />}
+
+          {/* 화면공유 버튼 */}
           {isPresenter && (
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
-              <button type="button" className="h-9 px-4 bg-[#0071ff] hover:bg-[#0064e6] text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <rect x="2" y="3" width="20" height="14" rx="2" stroke="white" strokeWidth="1.8"/>
-                  <path d="M8 21h8M12 17v4" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
-                </svg>
-                화면 공유
-              </button>
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
+              {isSharing ? (
+                <button
+                  type="button"
+                  onClick={stopShare}
+                  className="h-9 px-4 bg-[#e03131] hover:bg-[#c92a2a] text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <rect x="2" y="3" width="20" height="14" rx="2" stroke="white" strokeWidth="1.8"/>
+                    <path d="M8 21h8M12 17v4" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+                  </svg>
+                  공유 중단
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={startShare}
+                  className="h-9 px-4 bg-[#0071ff] hover:bg-[#0064e6] text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <rect x="2" y="3" width="20" height="14" rx="2" stroke="white" strokeWidth="1.8"/>
+                    <path d="M8 21h8M12 17v4" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+                  </svg>
+                  화면 공유
+                </button>
+              )}
             </div>
           )}
         </div>

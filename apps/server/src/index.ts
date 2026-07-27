@@ -47,7 +47,7 @@ const gameServer = new Server({
   transport: new WebSocketTransport({ server: httpServer, maxPayload: 256 * 1024 }),
 });
 
-gameServer.define("mentoring-room", ProximityRoom).filterBy(["roomId"]);
+gameServer.define("mentoring-room", ProximityRoom).filterBy(["dbRoomId"]);
 
 gameServer.listen(config.PORT).then(async () => {
   console.log(`[server] http://localhost:${config.PORT}`);
