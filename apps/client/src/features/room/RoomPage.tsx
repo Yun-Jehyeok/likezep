@@ -2,62 +2,99 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import type { Room } from "colyseus.js";
 import { useAuthStore } from "../../app/store.js";
-import { joinRoom } from "../../core/realtime/colyseusClient.js";
+import { joinRoom, type PlayerInfo } from "../../core/realtime/colyseusClient.js";
+import { GameApp } from "../../game/GameApp.js";
 
 export function RoomPage() {
   const { roomId } = useParams<{ roomId: string }>();
   const location = useLocation();
   const { user, token } = useAuthStore();
   const navigate = useNavigate();
+
   const [chatOpen, setChatOpen] = useState(true);
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [occupants, setOccupants] = useState(0);
   const [connError, setConnError] = useState<string | null>(null);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const roomRef = useRef<Room | null>(null);
+  const gameRef = useRef<GameApp | null>(null);
+  // Buffer players that arrive before GameApp is ready
+  const pendingPlayers = useRef<[string, PlayerInfo][]>([]);
 
   const roomName = (location.state as { roomName?: string } | null)?.roomName ?? roomId;
   const isPresenter = user?.role === "admin" || user?.role === "mentor";
 
   useEffect(() => {
-    if (!roomId || !token || !user) return;
+    if (!roomId || !token || !user || !canvasRef.current) return;
 
     let cancelled = false;
+    const canvas = canvasRef.current;
 
     joinRoom(roomId, token, user.name, {
-      onPlayerJoin: () => { if (!cancelled) setOccupants((n) => n + 1); },
-      onPlayerLeave: () => { if (!cancelled) setOccupants((n) => Math.max(0, n - 1)); },
-      onPlayerMove: () => {},
+      onPlayerJoin: (sessionId, info) => {
+        setOccupants((n) => n + 1);
+        if (gameRef.current) {
+          gameRef.current.addPlayer(sessionId, info);
+        } else {
+          pendingPlayers.current.push([sessionId, info]);
+        }
+      },
+      onPlayerLeave: (sessionId) => {
+        setOccupants((n) => Math.max(0, n - 1));
+        gameRef.current?.removePlayer(sessionId);
+      },
+      onPlayerMove: (sessionId, x, y) => {
+        gameRef.current?.movePlayer(sessionId, x, y);
+      },
       onProximityConnect: () => {},
       onProximityDisconnect: () => {},
       onWebRtcOffer: () => {},
       onWebRtcAnswer: () => {},
       onWebRtcIce: () => {},
     })
-      .then((room) => {
+      .then(async (room) => {
         if (cancelled) { room.leave(); return; }
         roomRef.current = room;
+
+        const game = await GameApp.create(canvas, room.sessionId, user.name, room);
+        if (cancelled) { game.destroy(); return; }
+        gameRef.current = game;
+
+        // Replay buffered players
+        for (const [sid, info] of pendingPlayers.current) {
+          game.addPlayer(sid, info);
+        }
+        pendingPlayers.current = [];
       })
-      .catch((err) => {
+      .catch((err: Error) => {
         if (!cancelled) setConnError(err?.message ?? "룸 연결에 실패했습니다.");
       });
 
     return () => {
       cancelled = true;
+      gameRef.current?.destroy();
+      gameRef.current = null;
       roomRef.current?.leave();
       roomRef.current = null;
     };
   }, [roomId, token, user]);
 
   function handleLeave() {
+    gameRef.current?.destroy();
+    gameRef.current = null;
     roomRef.current?.leave();
     roomRef.current = null;
     navigate("/lobby");
   }
 
+  function handleChatFocus() { gameRef.current?.setChatFocused(true); }
+  function handleChatBlur()  { gameRef.current?.setChatFocused(false); }
+
   return (
-    <div className="h-screen flex flex-col bg-[#f4f6f9] font-[Pretendard,sans-serif]">
+    <div className="h-screen flex flex-col font-[Pretendard,sans-serif]">
 
       {/* 상단 헤더 */}
       <header className="h-14 bg-white border-b border-[#e4e4e4] flex items-center justify-between px-4 shrink-0">
@@ -74,7 +111,7 @@ export function RoomPage() {
           <div className="w-px h-4 bg-[#e4e4e4]" />
           <span className="text-[15px] font-semibold text-[#17171b]">{roomName}</span>
           <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />
+            <span className={`w-1.5 h-1.5 rounded-full ${connError ? "bg-[#e03131]" : "bg-[#22c55e]"}`} />
             <span className="text-sm text-[#767676]">
               {connError ? "연결 실패" : `${occupants}명 접속 중`}
             </span>
@@ -108,32 +145,20 @@ export function RoomPage() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* PixiJS 캔버스 영역 */}
-        <div className="flex-1 relative bg-[#12121a]">
-          {connError ? (
-            <div className="absolute inset-0 flex items-center justify-center">
+        <div className="flex-1 relative">
+          <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+
+          {connError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-[#12121a]">
               <div className="text-center">
-                <p className="text-red-400 text-sm font-medium mb-2">연결 오류</p>
-                <p className="text-white/30 text-xs">{connError}</p>
-              </div>
-            </div>
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-20 h-20 rounded-2xl bg-white/5 border border-white/10 mx-auto mb-4 flex items-center justify-center">
-                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-                    <rect x="3" y="3" width="18" height="18" rx="2" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5"/>
-                    <circle cx="8.5" cy="8.5" r="1.5" fill="rgba(255,255,255,0.3)"/>
-                    <path d="M21 15l-5-5L5 21" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                <p className="text-white/30 text-sm font-medium">맵 준비 중</p>
-                <p className="text-white/15 text-xs mt-1">WASD로 이동 (구현 예정)</p>
+                <p className="text-red-400 text-sm font-medium mb-1">연결 오류</p>
+                <p className="text-white/40 text-xs">{connError}</p>
               </div>
             </div>
           )}
 
-          {/* 근접 화상 타일 */}
-          <div className="absolute top-4 right-4 flex flex-col gap-2">
+          {/* 근접 화상 타일 (Phase 4에서 실제 연결) */}
+          <div className="absolute top-4 right-4 flex flex-col gap-2 pointer-events-none">
             {[1, 2].map((i) => (
               <div
                 key={i}
@@ -151,7 +176,7 @@ export function RoomPage() {
             ))}
           </div>
 
-          {/* 화면공유 버튼 (멘토/관리자) */}
+          {/* 화면공유 버튼 (Phase 5) */}
           {isPresenter && (
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
               <button
@@ -171,7 +196,7 @@ export function RoomPage() {
         {/* 채팅 패널 */}
         {chatOpen && (
           <div className="w-72 bg-white border-l border-[#e4e4e4] flex flex-col shrink-0">
-            <div className="h-11 flex items-center justify-between px-4 border-b border-[#e4e4e4]">
+            <div className="h-11 flex items-center px-4 border-b border-[#e4e4e4]">
               <span className="text-sm font-semibold text-[#17171b]">채팅</span>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
@@ -183,6 +208,8 @@ export function RoomPage() {
                   type="text"
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
+                  onFocus={handleChatFocus}
+                  onBlur={handleChatBlur}
                   placeholder="메시지 입력..."
                   className="flex-1 text-sm text-[#17171b] placeholder:text-[#b2b2b2] outline-none bg-transparent"
                 />
@@ -219,9 +246,7 @@ export function RoomPage() {
           inactiveColor="bg-[#fff1f0] text-[#e03131]"
           icon={<CamIcon />}
         />
-
         <div className="w-px h-6 bg-[#e4e4e4] mx-1" />
-
         <button
           type="button"
           onClick={handleLeave}
@@ -237,15 +262,9 @@ export function RoomPage() {
   );
 }
 
-function ControlButton({
-  active, onClick, label, activeColor, inactiveColor, icon,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  activeColor: string;
-  inactiveColor: string;
-  icon: React.ReactNode;
+function ControlButton({ active, onClick, label, activeColor, inactiveColor, icon }: {
+  active: boolean; onClick: () => void; label: string;
+  activeColor: string; inactiveColor: string; icon: React.ReactNode;
 }) {
   return (
     <button
