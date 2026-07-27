@@ -50,10 +50,6 @@ export function useScreenShare(room: Room | null) {
         const recvTransport = device.createRecvTransport(transportParams);
         recvTransportRef.current = recvTransport;
 
-        recvTransport.on("connectionstatechange", (state: string) => {
-          console.log("[screenshare] recvTransport connectionState:", state);
-        });
-
         recvTransport.on("connect", async ({ dtlsParameters }: any, callback: () => void, errback: (e: Error) => void) => {
           try {
             await fetch(`${SERVER_HTTP_URL}/ms/transport/connect`, {
@@ -87,7 +83,6 @@ export function useScreenShare(room: Room | null) {
         consumerRef.current = consumer;
         await consumer.resume();
 
-        console.log("[screenshare] consumer track state:", consumer.track.readyState, "muted:", consumer.track.muted, "paused:", consumer.paused);
         const stream = new MediaStream([consumer.track]);
         setScreenStream(stream);
         console.log("[screenshare] consuming producerId:", producerId);
