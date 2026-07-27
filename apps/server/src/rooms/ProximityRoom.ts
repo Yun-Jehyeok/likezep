@@ -1,6 +1,11 @@
 import { Room, Client } from "@colyseus/core";
+import jwt from "jsonwebtoken";
 import { Player, ProximityRoomState } from "./schema/RoomState.js";
 import { computeProximityChanges } from "./logic/proximity.js";
+import { config } from "../config.js";
+import { findRoomById } from "../db/roomRepository.js";
+import { logAccess } from "../db/accessLogRepository.js";
+import type { AuthPayload } from "../api/middleware/auth.js";
 import type {
   MovePayload,
   MediaTogglePayload,
@@ -11,12 +16,15 @@ const CONNECT_THRESHOLD = 150;
 const DISCONNECT_THRESHOLD = 180;
 
 export class ProximityRoom extends Room<ProximityRoomState> {
-  private connectedPairs = new Set<string>(); // "a:b" where a < b
+  private connectedPairs = new Set<string>();
   private currentShare: { producerId: string; presenterId: string } | null = null;
+  private dbRoomId = "";
 
-  onCreate() {
+  onCreate(options: { roomId?: string }) {
+    this.dbRoomId = options.roomId ?? "";
     this.maxClients = 20;
     this.setState(new ProximityRoomState());
+    this.setMetadata({ roomId: this.dbRoomId });
     this.setSimulationInterval(this.tick.bind(this), 100);
 
     this.onMessage("move", (client: Client, payload: MovePayload) => {
@@ -27,7 +35,6 @@ export class ProximityRoom extends Room<ProximityRoomState> {
     });
 
     this.onMessage("media-toggle", (client: Client, payload: MediaTogglePayload) => {
-      // PoC 1: 미디어 상태는 state에 없으므로 무시
       void client;
       void payload;
     });
@@ -64,10 +71,28 @@ export class ProximityRoom extends Room<ProximityRoomState> {
     });
   }
 
+  async onAuth(_client: Client, options: { token?: string; roomId?: string }) {
+    const { token, roomId } = options;
+    if (!token) throw new Error("Token required");
+
+    const payload = jwt.verify(token, config.JWT_SECRET) as AuthPayload;
+
+    if (roomId) {
+      const room = await findRoomById(roomId);
+      if (!room) throw new Error("Room not found");
+      if (room.type === "private" && payload.role === "mentee" && payload.groupId !== room.groupId) {
+        throw new Error("Access denied");
+      }
+    }
+
+    return payload;
+  }
+
   onJoin(client: Client, options: { name?: string }) {
+    const auth = client.auth as AuthPayload | undefined;
     const player = new Player();
     player.id = client.sessionId;
-    player.name = options.name ?? "Anonymous";
+    player.name = options.name ?? auth?.userId ?? "Anonymous";
     player.x = 400 + (Math.random() * 100 - 50);
     player.y = 300 + (Math.random() * 100 - 50);
     this.state.players.set(client.sessionId, player);
@@ -75,9 +100,18 @@ export class ProximityRoom extends Room<ProximityRoomState> {
     if (this.currentShare) {
       client.send("screenshare-started", this.currentShare);
     }
+
+    if (auth?.userId && this.dbRoomId) {
+      logAccess(auth.userId, this.dbRoomId, "join").catch(console.error);
+    }
   }
 
   onLeave(client: Client) {
+    const auth = client.auth as AuthPayload | undefined;
+    if (auth?.userId && this.dbRoomId) {
+      logAccess(auth.userId, this.dbRoomId, "leave").catch(console.error);
+    }
+
     if (this.currentShare?.presenterId === client.sessionId) {
       this.currentShare = null;
       this.broadcast("screenshare-stopped", { presenterId: client.sessionId });
@@ -118,7 +152,6 @@ export class ProximityRoom extends Room<ProximityRoomState> {
 
     for (const pair of toConnect) {
       this.connectedPairs.add(`${pair.a}:${pair.b}`);
-      // pair.a < pair.b 이므로 a가 offerer
       this.clients.getById(pair.a)?.send("proximity-connect", { peerId: pair.b, isOfferer: true });
       this.clients.getById(pair.b)?.send("proximity-connect", { peerId: pair.a, isOfferer: false });
     }

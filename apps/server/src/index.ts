@@ -7,6 +7,7 @@ import { generateTurnCredentials } from "./turn/credentials.js";
 import { mediasoupRouter } from "./mediasoup/index.js";
 import { getWorker } from "./mediasoup/worker.js";
 import { authRouter } from "./api/auth.js";
+import { roomsRouter } from "./api/rooms.js";
 import { config } from "./config.js";
 
 const app = express();
@@ -21,6 +22,7 @@ app.options("*", (_req, res) => res.sendStatus(204));
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRouter);
+app.use("/api/rooms", roomsRouter);
 app.use("/ms", mediasoupRouter);
 
 app.get("/turn-credentials", (_req, res) => {
@@ -45,7 +47,7 @@ const gameServer = new Server({
   transport: new WebSocketTransport({ server: httpServer, maxPayload: 256 * 1024 }),
 });
 
-gameServer.define("poc-room", ProximityRoom);
+gameServer.define("mentoring-room", ProximityRoom).filterBy(["roomId"]);
 
 gameServer.listen(config.PORT).then(async () => {
   console.log(`[server] http://localhost:${config.PORT}`);

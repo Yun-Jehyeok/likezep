@@ -1,26 +1,60 @@
-import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import type { Room } from "colyseus.js";
 import { useAuthStore } from "../../app/store.js";
-
-const MOCK_ROOM_NAMES: Record<string, string> = {
-  "room-plaza": "광장",
-  "room-meeting": "회의실",
-  "room-g1": "A그룹 룸",
-  "room-g2": "B그룹 룸",
-  "room-g3": "C그룹 룸",
-};
+import { joinRoom } from "../../core/realtime/colyseusClient.js";
 
 export function RoomPage() {
   const { roomId } = useParams<{ roomId: string }>();
-  const { user } = useAuthStore();
+  const location = useLocation();
+  const { user, token } = useAuthStore();
   const navigate = useNavigate();
   const [chatOpen, setChatOpen] = useState(true);
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(false);
   const [chatInput, setChatInput] = useState("");
+  const [occupants, setOccupants] = useState(0);
+  const [connError, setConnError] = useState<string | null>(null);
+  const roomRef = useRef<Room | null>(null);
 
-  const roomName = MOCK_ROOM_NAMES[roomId ?? ""] ?? roomId;
+  const roomName = (location.state as { roomName?: string } | null)?.roomName ?? roomId;
   const isPresenter = user?.role === "admin" || user?.role === "mentor";
+
+  useEffect(() => {
+    if (!roomId || !token || !user) return;
+
+    let cancelled = false;
+
+    joinRoom(roomId, token, user.name, {
+      onPlayerJoin: () => { if (!cancelled) setOccupants((n) => n + 1); },
+      onPlayerLeave: () => { if (!cancelled) setOccupants((n) => Math.max(0, n - 1)); },
+      onPlayerMove: () => {},
+      onProximityConnect: () => {},
+      onProximityDisconnect: () => {},
+      onWebRtcOffer: () => {},
+      onWebRtcAnswer: () => {},
+      onWebRtcIce: () => {},
+    })
+      .then((room) => {
+        if (cancelled) { room.leave(); return; }
+        roomRef.current = room;
+      })
+      .catch((err) => {
+        if (!cancelled) setConnError(err?.message ?? "룸 연결에 실패했습니다.");
+      });
+
+    return () => {
+      cancelled = true;
+      roomRef.current?.leave();
+      roomRef.current = null;
+    };
+  }, [roomId, token, user]);
+
+  function handleLeave() {
+    roomRef.current?.leave();
+    roomRef.current = null;
+    navigate("/lobby");
+  }
 
   return (
     <div className="h-screen flex flex-col bg-[#f4f6f9] font-[Pretendard,sans-serif]">
@@ -30,7 +64,7 @@ export function RoomPage() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate("/lobby")}
+            onClick={handleLeave}
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#f4f6f9] text-[#767676] hover:text-[#17171b] transition-colors"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -41,7 +75,9 @@ export function RoomPage() {
           <span className="text-[15px] font-semibold text-[#17171b]">{roomName}</span>
           <div className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />
-            <span className="text-sm text-[#767676]">3명 접속 중</span>
+            <span className="text-sm text-[#767676]">
+              {connError ? "연결 실패" : `${occupants}명 접속 중`}
+            </span>
           </div>
         </div>
 
@@ -73,20 +109,28 @@ export function RoomPage() {
 
         {/* PixiJS 캔버스 영역 */}
         <div className="flex-1 relative bg-[#12121a]">
-          {/* TODO: PixiJS 맵/아바타 렌더링 */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-20 h-20 rounded-2xl bg-white/5 border border-white/10 mx-auto mb-4 flex items-center justify-center">
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-                  <rect x="3" y="3" width="18" height="18" rx="2" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5"/>
-                  <circle cx="8.5" cy="8.5" r="1.5" fill="rgba(255,255,255,0.3)"/>
-                  <path d="M21 15l-5-5L5 21" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+          {connError ? (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-red-400 text-sm font-medium mb-2">연결 오류</p>
+                <p className="text-white/30 text-xs">{connError}</p>
               </div>
-              <p className="text-white/30 text-sm font-medium">맵 준비 중</p>
-              <p className="text-white/15 text-xs mt-1">WASD로 이동 (구현 예정)</p>
             </div>
-          </div>
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-20 h-20 rounded-2xl bg-white/5 border border-white/10 mx-auto mb-4 flex items-center justify-center">
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="3" width="18" height="18" rx="2" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5"/>
+                    <circle cx="8.5" cy="8.5" r="1.5" fill="rgba(255,255,255,0.3)"/>
+                    <path d="M21 15l-5-5L5 21" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <p className="text-white/30 text-sm font-medium">맵 준비 중</p>
+                <p className="text-white/15 text-xs mt-1">WASD로 이동 (구현 예정)</p>
+              </div>
+            </div>
+          )}
 
           {/* 근접 화상 타일 */}
           <div className="absolute top-4 right-4 flex flex-col gap-2">
@@ -180,7 +224,7 @@ export function RoomPage() {
 
         <button
           type="button"
-          onClick={() => navigate("/lobby")}
+          onClick={handleLeave}
           className="h-10 px-4 rounded-xl bg-[#fff1f0] hover:bg-[#ffe3e2] text-[#e03131] text-sm font-medium transition-colors flex items-center gap-2"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">

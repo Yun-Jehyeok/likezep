@@ -1,21 +1,15 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../app/store.js";
+import { api } from "../../core/api/client.js";
 
 interface RoomCard {
   id: string;
   name: string;
   type: "public" | "private";
+  groupId: string | null;
   occupants: number;
 }
-
-// TODO: GET /api/rooms 로 교체
-const MOCK_ROOMS: RoomCard[] = [
-  { id: "room-plaza", name: "광장", type: "public", occupants: 8 },
-  { id: "room-meeting", name: "회의실", type: "public", occupants: 3 },
-  { id: "room-g1", name: "A그룹 룸", type: "private", occupants: 4 },
-  { id: "room-g2", name: "B그룹 룸", type: "private", occupants: 5 },
-  { id: "room-g3", name: "C그룹 룸", type: "private", occupants: 0 },
-];
 
 const ROLE_LABEL: Record<string, string> = {
   admin: "관리자",
@@ -32,10 +26,21 @@ const ROLE_STYLE: Record<string, string> = {
 export function LobbyPage() {
   const { user, clearAuth } = useAuthStore();
   const navigate = useNavigate();
+  const [rooms, setRooms] = useState<RoomCard[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const visibleRooms = user?.role === "mentee"
-    ? MOCK_ROOMS.filter((r) => r.type === "public" || r.id === "room-g1")
-    : MOCK_ROOMS;
+  useEffect(() => {
+    function fetchRooms() {
+      return api.get<RoomCard[]>("/api/rooms")
+        .then(setRooms)
+        .catch(() => setError("룸 목록을 불러오지 못했습니다."));
+    }
+
+    fetchRooms().finally(() => setLoading(false));
+    const interval = setInterval(fetchRooms, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   function handleLogout() {
     clearAuth();
@@ -90,21 +95,35 @@ export function LobbyPage() {
           <p className="text-sm text-[#767676] mt-1">공간을 선택하면 바로 입장합니다</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {visibleRooms.map((room) => (
-            <RoomCard
-              key={room.id}
-              room={room}
-              onClick={() => navigate(`/room/${room.id}`)}
-            />
-          ))}
-        </div>
+        {loading && (
+          <div className="flex justify-center py-16">
+            <span className="w-6 h-6 border-2 border-[#e4e4e4] border-t-[#0071ff] rounded-full animate-spin" />
+          </div>
+        )}
+
+        {error && (
+          <div className="px-4 py-3 rounded-xl bg-[#fff1f0] border border-[#ffd6d3] text-[#e03131] text-sm">
+            {error}
+          </div>
+        )}
+
+        {!loading && !error && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {rooms.map((room) => (
+              <RoomCardItem
+                key={room.id}
+                room={room}
+                onClick={() => navigate(`/room/${room.id}`, { state: { roomName: room.name } })}
+              />
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );
 }
 
-function RoomCard({ room, onClick }: { room: RoomCard; onClick: () => void }) {
+function RoomCardItem({ room, onClick }: { room: RoomCard; onClick: () => void }) {
   const isEmpty = room.occupants === 0;
 
   return (
@@ -113,29 +132,21 @@ function RoomCard({ room, onClick }: { room: RoomCard; onClick: () => void }) {
       onClick={onClick}
       className="bg-white rounded-2xl border border-[#e4e4e4] hover:border-[#0071ff] hover:shadow-[0_4px_20px_rgba(0,113,255,0.12)] p-5 text-left transition-all group"
     >
-      {/* 배지 + 이름 */}
       <div className="flex items-start justify-between mb-4">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#f4f6f9] group-hover:bg-[#e8f1ff] transition-colors">
-          {room.type === "public"
-            ? <PublicIcon />
-            : <PrivateIcon />
-          }
+          {room.type === "public" ? <PublicIcon /> : <PrivateIcon />}
         </div>
         <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
-          room.type === "public"
-            ? "bg-[#e8f7ee] text-[#1a7a3f]"
-            : "bg-[#f0ebff] text-[#6b21e8]"
+          room.type === "public" ? "bg-[#e8f7ee] text-[#1a7a3f]" : "bg-[#f0ebff] text-[#6b21e8]"
         }`}>
           {room.type === "public" ? "공용" : "프라이빗"}
         </span>
       </div>
 
-      {/* 룸 이름 */}
       <p className="text-[16px] font-semibold text-[#17171b] group-hover:text-[#0071ff] transition-colors mb-1">
         {room.name}
       </p>
 
-      {/* 접속 인원 */}
       <div className="flex items-center gap-1.5">
         <span className={`w-1.5 h-1.5 rounded-full ${isEmpty ? "bg-[#b2b2b2]" : "bg-[#22c55e]"}`} />
         <span className={`text-sm ${isEmpty ? "text-[#b2b2b2]" : "text-[#767676]"}`}>

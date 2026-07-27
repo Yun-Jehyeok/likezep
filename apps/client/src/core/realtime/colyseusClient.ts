@@ -26,13 +26,9 @@ export interface RoomCallbacks {
   onWebRtcIce(from: string, candidate: RTCIceCandidateInit): void;
 }
 
-export async function joinPocRoom(playerName: string, callbacks: RoomCallbacks): Promise<Room> {
-  const client = new Client(WS_URL);
-  const room = await client.joinOrCreate("poc-room", { name: playerName });
-
+function attachCallbacks(room: Room, callbacks: RoomCallbacks) {
   const $ = getStateCallbacks(room);
 
-  // State callbacks — fire for existing players immediately (immediate=true)
   ($(room.state as any).players as any).onAdd((player: any, sessionId: string) => {
     callbacks.onPlayerJoin(sessionId, {
       id: player.id,
@@ -40,8 +36,6 @@ export async function joinPocRoom(playerName: string, callbacks: RoomCallbacks):
       x: player.x,
       y: player.y,
     });
-
-    // Track individual position changes
     ($(player) as any).onChange(() => {
       callbacks.onPlayerMove(sessionId, player.x, player.y);
     });
@@ -51,27 +45,43 @@ export async function joinPocRoom(playerName: string, callbacks: RoomCallbacks):
     callbacks.onPlayerLeave(sessionId);
   });
 
-  // Proximity events
   room.onMessage<ProximityConnectPayload>("proximity-connect", ({ peerId, isOfferer }) => {
     callbacks.onProximityConnect(peerId, isOfferer);
   });
-
   room.onMessage<ProximityDisconnectPayload>("proximity-disconnect", ({ peerId }) => {
     callbacks.onProximityDisconnect(peerId);
   });
-
-  // WebRTC signaling relay
   room.onMessage<WebRtcRelayPayload>("webrtc-offer", ({ from, sdp }) => {
     if (sdp) callbacks.onWebRtcOffer(from, sdp as RTCSessionDescriptionInit);
   });
-
   room.onMessage<WebRtcRelayPayload>("webrtc-answer", ({ from, sdp }) => {
     if (sdp) callbacks.onWebRtcAnswer(from, sdp as RTCSessionDescriptionInit);
   });
-
   room.onMessage<WebRtcRelayPayload>("webrtc-ice", ({ from, candidate }) => {
     if (candidate) callbacks.onWebRtcIce(from, candidate as RTCIceCandidateInit);
   });
+}
 
+export async function joinRoom(
+  dbRoomId: string,
+  token: string,
+  playerName: string,
+  callbacks: RoomCallbacks,
+): Promise<Room> {
+  const client = new Client(WS_URL);
+  const room = await client.joinOrCreate("mentoring-room", {
+    roomId: dbRoomId,
+    token,
+    name: playerName,
+  });
+  attachCallbacks(room, callbacks);
+  return room;
+}
+
+/** @deprecated PoC 전용. MVP는 joinRoom 사용. */
+export async function joinPocRoom(playerName: string, callbacks: RoomCallbacks): Promise<Room> {
+  const client = new Client(WS_URL);
+  const room = await client.joinOrCreate("poc-room", { name: playerName });
+  attachCallbacks(room, callbacks);
   return room;
 }
