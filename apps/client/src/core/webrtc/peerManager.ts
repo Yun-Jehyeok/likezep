@@ -3,6 +3,7 @@ import { setPeer, getPeer } from "./cleanup.js";
 // Buffer candidates that arrive before setRemoteDescription
 const iceCandidateQueue = new Map<string, RTCIceCandidateInit[]>();
 
+
 type SendSignal = (type: string, payload: object) => void;
 type OnRemoteStream = (peerId: string, stream: MediaStream) => void;
 
@@ -98,6 +99,19 @@ export async function handleAnswer(
   if (!pc) return;
   await pc.setRemoteDescription(answer);
   await flushCandidateQueue(peerId, pc);
+}
+
+export async function addTrackToPeer(
+  peerId: string,
+  track: MediaStreamTrack,
+  stream: MediaStream,
+): Promise<{ type: string; sdp: string } | null> {
+  const pc = getPeer(peerId);
+  if (!pc || pc.signalingState !== "stable") return null;
+  pc.addTrack(track, stream);
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  return { type: offer.type, sdp: offer.sdp! };
 }
 
 export async function handleIceCandidate(

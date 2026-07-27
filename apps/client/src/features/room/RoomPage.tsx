@@ -11,8 +11,9 @@ import {
   initPeerAsAnswerer,
   handleAnswer,
   handleIceCandidate,
+  addTrackToPeer,
 } from "../../core/webrtc/peerManager.js";
-import { cleanupPeer, cleanupAllPeers } from "../../core/webrtc/cleanup.js";
+import { cleanupPeer, cleanupAllPeers, getPeer, activePeerIds } from "../../core/webrtc/cleanup.js";
 import { useScreenShare } from "../screenshare/useScreenShare.js";
 import { ScreenShareOverlay } from "./ScreenShareOverlay.js";
 import { RoomSwitcher } from "./RoomSwitcher.js";
@@ -141,6 +142,15 @@ export function RoomPage() {
         });
       },
       onWebRtcOffer: async (from, sdp) => {
+        const existingPc = getPeer(from);
+        if (existingPc) {
+          // Renegotiation: reuse existing connection
+          await existingPc.setRemoteDescription(sdp);
+          const answer = await existingPc.createAnswer();
+          await existingPc.setLocalDescription(answer);
+          sendSignal("webrtc-answer", { to: from, sdp: { type: answer.type, sdp: answer.sdp } });
+          return;
+        }
         const iceServers = await getIceServers();
         const stream = await ensureLocalStream();
         await initPeerAsAnswerer(from, stream, iceServers, sdp, sendSignal, onRemoteStream);
@@ -234,19 +244,39 @@ export function RoomPage() {
   async function toggleCam() {
     if (!camOn) {
       try {
+        let newVideoTrack: MediaStreamTrack | null = null;
+
         if (!localStreamRef.current) {
           const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
           localStreamRef.current = s;
           setMicOn(true);
+          newVideoTrack = s.getVideoTracks()[0] ?? null;
         } else {
           const videoTracks = localStreamRef.current.getVideoTracks();
           if (videoTracks.length === 0) {
             const vs = await navigator.mediaDevices.getUserMedia({ video: true });
-            vs.getVideoTracks().forEach((t) => localStreamRef.current!.addTrack(t));
+            vs.getVideoTracks().forEach((t) => {
+              localStreamRef.current!.addTrack(t);
+              newVideoTrack = t;
+            });
           } else {
+            // Track already in peer connections — just re-enable
             videoTracks.forEach((t) => { t.enabled = true; });
           }
         }
+
+        // Renegotiate with all active peers to send the new video track
+        if (newVideoTrack && localStreamRef.current) {
+          const track = newVideoTrack;
+          const stream = localStreamRef.current;
+          for (const peerId of activePeerIds()) {
+            const offer = await addTrackToPeer(peerId, track, stream);
+            if (offer) {
+              roomSendRef.current("webrtc-offer", { to: peerId, sdp: offer });
+            }
+          }
+        }
+
         setCamOn(true);
       } catch { /* permission denied */ }
     } else {
