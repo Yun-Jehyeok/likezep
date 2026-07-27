@@ -4,5 +4,6 @@ packages:
 allowBuilds:
   '@prisma/engines': true
   esbuild: true
+  mediasoup: true
   msgpackr-extract: true
   prisma: true

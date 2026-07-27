@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import type { Room } from "colyseus.js";
 import { useGameStore } from "../../core/store/gameStore.js";
 import { joinPocRoom } from "../../core/realtime/colyseusClient.js";
@@ -12,6 +12,9 @@ import { getIceServers } from "../../core/webrtc/iceServers.js";
 import { cleanupAllPeers, cleanupPeer } from "../../core/webrtc/cleanup.js";
 import { GameCanvas } from "./GameCanvas.js";
 import { VideoGrid } from "./VideoGrid.js";
+import { useScreenShare } from "../screenshare/useScreenShare.js";
+import { ScreenShareButton } from "../screenshare/ScreenShareButton.js";
+import { ScreenShareView } from "../screenshare/ScreenShareView.js";
 
 interface Props {
   playerName: string;
@@ -19,7 +22,10 @@ interface Props {
 
 export function GameScreen({ playerName }: Props) {
   const roomRef = useRef<Room | null>(null);
+  const [room, setRoom] = useState<Room | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+
+  const { isSharing, startShare, stopShare, screenStream } = useScreenShare(room);
 
   useEffect(() => {
     let active = true;
@@ -38,7 +44,7 @@ export function GameScreen({ playerName }: Props) {
       const { setMySessionId, upsertPlayer, updatePlayerPosition, removePlayer, removeRemoteStream } =
         useGameStore.getState();
 
-      const room = await joinPocRoom(playerName, {
+      const joinedRoom = await joinPocRoom(playerName, {
         onPlayerJoin(sessionId, player) {
           upsertPlayer(sessionId, player);
         },
@@ -72,12 +78,13 @@ export function GameScreen({ playerName }: Props) {
       });
 
       if (!active) {
-        room.leave();
+        joinedRoom.leave();
         return;
       }
 
-      roomRef.current = room;
-      setMySessionId(room.sessionId);
+      roomRef.current = joinedRoom;
+      setRoom(joinedRoom);
+      setMySessionId(joinedRoom.sessionId);
     }
 
     function sendSignal(type: string, payload: object) {
@@ -116,6 +123,8 @@ export function GameScreen({ playerName }: Props) {
     >
       <GameCanvas onMove={handleMove} />
       <VideoGrid />
+      <ScreenShareView stream={screenStream} />
+      <ScreenShareButton isSharing={isSharing} onStart={startShare} onStop={stopShare} />
     </div>
   );
 }

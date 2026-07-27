@@ -51,6 +51,19 @@ export class ProximityRoom extends Room<ProximityRoomState> {
         candidate: payload.candidate,
       });
     });
+
+    this.onMessage("screenshare-start", (client: Client, payload: { producerId: string }) => {
+      this.broadcast("screenshare-started", {
+        producerId: payload.producerId,
+        presenterId: client.sessionId,
+      }, { except: client });
+    });
+
+    this.onMessage("screenshare-stop", (client: Client) => {
+      this.broadcast("screenshare-stopped", {
+        presenterId: client.sessionId,
+      }, { except: client });
+    });
   }
 
   onJoin(client: Client, options: { name?: string }) {

@@ -12,4 +12,8 @@ export type {
   WebRtcRelayPayload,
   RtcSdp,
   RtcIceCandidate,
+  ScreenShareStartPayload,
+  ScreenShareStopPayload,
+  ScreenShareBroadcastPayload,
+  ScreenShareStoppedPayload,
 } from "./messages.js";

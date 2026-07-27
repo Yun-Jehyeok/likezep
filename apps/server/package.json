@@ -12,12 +12,13 @@
     "db:seed": "tsx src/db/seed.ts"
   },
   "dependencies": {
-    "@mentoring/shared": "workspace:*",
     "@colyseus/core": "^0.16.0",
     "@colyseus/schema": "^3.0.0",
     "@colyseus/ws-transport": "^0.16.0",
+    "@mentoring/shared": "workspace:*",
     "express": "^4.19.0",
     "jsonwebtoken": "^9.0.0",
+    "mediasoup": "^3.22.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
