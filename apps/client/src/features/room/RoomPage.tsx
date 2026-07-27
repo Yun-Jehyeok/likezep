@@ -4,6 +4,30 @@ import type { Room } from "colyseus.js";
 import { useAuthStore } from "../../app/store.js";
 import { joinRoom, type PlayerInfo } from "../../core/realtime/colyseusClient.js";
 import { GameApp } from "../../game/GameApp.js";
+import { api } from "../../core/api/client.js";
+import { getIceServers } from "../../core/webrtc/iceServers.js";
+import {
+  initPeerAsOfferer,
+  initPeerAsAnswerer,
+  handleAnswer,
+  handleIceCandidate,
+} from "../../core/webrtc/peerManager.js";
+import { cleanupPeer, cleanupAllPeers } from "../../core/webrtc/cleanup.js";
+
+interface ChatMessage {
+  id?: string;
+  userId: string;
+  name: string;
+  text?: string;
+  content?: string;
+  timestamp?: string;
+  createdAt?: string;
+}
+
+interface RemotePeer {
+  stream: MediaStream;
+  name: string;
+}
 
 export function RoomPage() {
   const { roomId } = useParams<{ roomId: string }>();
@@ -17,15 +41,25 @@ export function RoomPage() {
   const [chatInput, setChatInput] = useState("");
   const [occupants, setOccupants] = useState(0);
   const [connError, setConnError] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [remotePeers, setRemotePeers] = useState<Record<string, RemotePeer>>({});
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const roomRef = useRef<Room | null>(null);
   const gameRef = useRef<GameApp | null>(null);
-  // Buffer players that arrive before GameApp is ready
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const roomSendRef = useRef<(type: string, payload: unknown) => void>(() => {});
+  const playerNamesRef = useRef<Map<string, string>>(new Map());
   const pendingPlayers = useRef<[string, PlayerInfo][]>([]);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const roomName = (location.state as { roomName?: string } | null)?.roomName ?? roomId;
   const isPresenter = user?.role === "admin" || user?.role === "mentor";
+
+  // Scroll chat to bottom on new message
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   useEffect(() => {
     if (!roomId || !token || !user || !canvasRef.current) return;
@@ -33,9 +67,30 @@ export function RoomPage() {
     let cancelled = false;
     const canvas = canvasRef.current;
 
+    const sendSignal = (type: string, payload: object) => roomSendRef.current(type, payload);
+
+    async function ensureLocalStream(): Promise<MediaStream> {
+      if (localStreamRef.current) return localStreamRef.current;
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        localStreamRef.current = s;
+        return s;
+      } catch {
+        const s = new MediaStream();
+        localStreamRef.current = s;
+        return s;
+      }
+    }
+
+    function onRemoteStream(peerId: string, stream: MediaStream) {
+      const name = playerNamesRef.current.get(peerId) ?? peerId.slice(0, 6);
+      setRemotePeers((prev) => ({ ...prev, [peerId]: { stream, name } }));
+    }
+
     joinRoom(roomId, token, user.name, {
       onPlayerJoin: (sessionId, info) => {
         setOccupants((n) => n + 1);
+        playerNamesRef.current.set(sessionId, info.name);
         if (gameRef.current) {
           gameRef.current.addPlayer(sessionId, info);
         } else {
@@ -44,29 +99,69 @@ export function RoomPage() {
       },
       onPlayerLeave: (sessionId) => {
         setOccupants((n) => Math.max(0, n - 1));
+        playerNamesRef.current.delete(sessionId);
         gameRef.current?.removePlayer(sessionId);
+        cleanupPeer(sessionId);
+        setRemotePeers((prev) => {
+          const next = { ...prev };
+          delete next[sessionId];
+          return next;
+        });
       },
       onPlayerMove: (sessionId, x, y) => {
         gameRef.current?.movePlayer(sessionId, x, y);
       },
-      onProximityConnect: () => {},
-      onProximityDisconnect: () => {},
-      onWebRtcOffer: () => {},
-      onWebRtcAnswer: () => {},
-      onWebRtcIce: () => {},
+      onProximityConnect: async (peerId, isOfferer) => {
+        const iceServers = await getIceServers();
+        const stream = await ensureLocalStream();
+        if (isOfferer) {
+          await initPeerAsOfferer(peerId, stream, iceServers, sendSignal, onRemoteStream);
+        } else {
+          // answerer waits for offer via onWebRtcOffer
+          void peerId;
+        }
+      },
+      onProximityDisconnect: (peerId) => {
+        cleanupPeer(peerId);
+        setRemotePeers((prev) => {
+          const next = { ...prev };
+          delete next[peerId];
+          return next;
+        });
+      },
+      onWebRtcOffer: async (from, sdp) => {
+        const iceServers = await getIceServers();
+        const stream = await ensureLocalStream();
+        await initPeerAsAnswerer(from, stream, iceServers, sdp, sendSignal, onRemoteStream);
+      },
+      onWebRtcAnswer: async (from, sdp) => {
+        await handleAnswer(from, sdp);
+      },
+      onWebRtcIce: async (from, candidate) => {
+        await handleIceCandidate(from, candidate);
+      },
     })
       .then(async (room) => {
         if (cancelled) { room.leave(); return; }
         roomRef.current = room;
+        roomSendRef.current = (type, payload) => room.send(type, payload);
 
+        // Listen to chat messages
+        room.onMessage<ChatMessage>("chat", (msg) => {
+          if (!cancelled) setMessages((prev) => [...prev, msg]);
+        });
+
+        // Load chat history
+        api.get<ChatMessage[]>(`/api/rooms/${roomId}/chat`)
+          .then((history) => { if (!cancelled) setMessages(history); })
+          .catch(console.error);
+
+        // Init PixiJS
         const game = await GameApp.create(canvas, room.sessionId, user.name, room);
         if (cancelled) { game.destroy(); return; }
         gameRef.current = game;
 
-        // Replay buffered players
-        for (const [sid, info] of pendingPlayers.current) {
-          game.addPlayer(sid, info);
-        }
+        for (const [sid, info] of pendingPlayers.current) game.addPlayer(sid, info);
         pendingPlayers.current = [];
       })
       .catch((err: Error) => {
@@ -75,6 +170,9 @@ export function RoomPage() {
 
     return () => {
       cancelled = true;
+      cleanupAllPeers();
+      localStreamRef.current?.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
       gameRef.current?.destroy();
       gameRef.current = null;
       roomRef.current?.leave();
@@ -83,6 +181,9 @@ export function RoomPage() {
   }, [roomId, token, user]);
 
   function handleLeave() {
+    cleanupAllPeers();
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    localStreamRef.current = null;
     gameRef.current?.destroy();
     gameRef.current = null;
     roomRef.current?.leave();
@@ -92,6 +193,55 @@ export function RoomPage() {
 
   function handleChatFocus() { gameRef.current?.setChatFocused(true); }
   function handleChatBlur()  { gameRef.current?.setChatFocused(false); }
+
+  function submitChat() {
+    const text = chatInput.trim();
+    if (!text) return;
+    roomSendRef.current("chat", { text });
+    setChatInput("");
+  }
+
+  async function toggleMic() {
+    if (!micOn) {
+      try {
+        if (!localStreamRef.current) {
+          const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          localStreamRef.current = s;
+        }
+        localStreamRef.current.getAudioTracks().forEach((t) => { t.enabled = true; });
+        setMicOn(true);
+      } catch { /* permission denied */ }
+    } else {
+      localStreamRef.current?.getAudioTracks().forEach((t) => { t.enabled = false; });
+      setMicOn(false);
+    }
+  }
+
+  async function toggleCam() {
+    if (!camOn) {
+      try {
+        if (!localStreamRef.current) {
+          const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+          localStreamRef.current = s;
+          setMicOn(true);
+        } else {
+          const videoTracks = localStreamRef.current.getVideoTracks();
+          if (videoTracks.length === 0) {
+            const vs = await navigator.mediaDevices.getUserMedia({ video: true });
+            vs.getVideoTracks().forEach((t) => localStreamRef.current!.addTrack(t));
+          } else {
+            videoTracks.forEach((t) => { t.enabled = true; });
+          }
+        }
+        setCamOn(true);
+      } catch { /* permission denied */ }
+    } else {
+      localStreamRef.current?.getVideoTracks().forEach((t) => { t.enabled = false; });
+      setCamOn(false);
+    }
+  }
+
+  const remotePeerList = Object.entries(remotePeers);
 
   return (
     <div className="h-screen flex flex-col font-[Pretendard,sans-serif]">
@@ -120,19 +270,14 @@ export function RoomPage() {
 
         <div className="flex items-center gap-2">
           {isPresenter && (
-            <button
-              type="button"
-              className="h-8 px-3 text-sm font-medium text-[#767676] border border-[#e4e4e4] rounded-lg hover:border-[#0071ff] hover:text-[#0071ff] transition-colors"
-            >
+            <button type="button" className="h-8 px-3 text-sm font-medium text-[#767676] border border-[#e4e4e4] rounded-lg hover:border-[#0071ff] hover:text-[#0071ff] transition-colors">
               방 전환
             </button>
           )}
           <button
             type="button"
             onClick={() => setChatOpen((o) => !o)}
-            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
-              chatOpen ? "bg-[#e8f1ff] text-[#0071ff]" : "hover:bg-[#f4f6f9] text-[#767676]"
-            }`}
+            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${chatOpen ? "bg-[#e8f1ff] text-[#0071ff]" : "hover:bg-[#f4f6f9] text-[#767676]"}`}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
@@ -141,10 +286,10 @@ export function RoomPage() {
         </div>
       </header>
 
-      {/* 메인 영역 */}
+      {/* 메인 */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* PixiJS 캔버스 영역 */}
+        {/* 게임 캔버스 */}
         <div className="flex-1 relative">
           <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
 
@@ -157,32 +302,19 @@ export function RoomPage() {
             </div>
           )}
 
-          {/* 근접 화상 타일 (Phase 4에서 실제 연결) */}
-          <div className="absolute top-4 right-4 flex flex-col gap-2 pointer-events-none">
-            {[1, 2].map((i) => (
-              <div
-                key={i}
-                className="w-28 h-20 rounded-xl bg-white/10 border border-white/10 backdrop-blur-sm flex items-center justify-center"
-              >
-                <div className="flex flex-col items-center gap-1.5">
-                  <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                  <span className="text-white/40 text-[10px]">참가자 {i}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          {/* 근접 화상 타일 */}
+          {remotePeerList.length > 0 && (
+            <div className="absolute top-4 right-4 flex flex-col gap-2 pointer-events-none">
+              {remotePeerList.map(([peerId, peer]) => (
+                <VideoTile key={peerId} stream={peer.stream} name={peer.name} />
+              ))}
+            </div>
+          )}
 
-          {/* 화면공유 버튼 (Phase 5) */}
+          {/* 화면공유 (Phase 5) */}
           {isPresenter && (
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
-              <button
-                type="button"
-                className="h-9 px-4 bg-[#0071ff] hover:bg-[#0064e6] text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2"
-              >
+              <button type="button" className="h-9 px-4 bg-[#0071ff] hover:bg-[#0064e6] text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                   <rect x="2" y="3" width="20" height="14" rx="2" stroke="white" strokeWidth="1.8"/>
                   <path d="M8 21h8M12 17v4" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
@@ -199,9 +331,33 @@ export function RoomPage() {
             <div className="h-11 flex items-center px-4 border-b border-[#e4e4e4]">
               <span className="text-sm font-semibold text-[#17171b]">채팅</span>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <p className="text-[#b2b2b2] text-xs text-center py-6">채팅 기록이 없습니다</p>
+
+            <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+              {messages.length === 0 ? (
+                <p className="text-[#b2b2b2] text-xs text-center py-6">채팅 기록이 없습니다</p>
+              ) : (
+                messages.map((msg, i) => {
+                  const isMe = msg.userId === user?.id;
+                  const text = msg.text ?? msg.content ?? "";
+                  return (
+                    <div key={msg.id ?? i} className={`flex flex-col gap-0.5 ${isMe ? "items-end" : "items-start"}`}>
+                      {!isMe && (
+                        <span className="text-[11px] text-[#767676] px-1">{msg.name}</span>
+                      )}
+                      <div className={`max-w-[200px] px-3 py-2 rounded-2xl text-sm break-words ${
+                        isMe
+                          ? "bg-[#0071ff] text-white rounded-tr-sm"
+                          : "bg-[#f4f6f9] text-[#17171b] rounded-tl-sm"
+                      }`}>
+                        {text}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+              <div ref={chatEndRef} />
             </div>
+
             <div className="p-3 border-t border-[#e4e4e4]">
               <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-[#e4e4e4] focus-within:border-[#0071ff] transition-colors bg-white">
                 <input
@@ -210,13 +366,15 @@ export function RoomPage() {
                   onChange={(e) => setChatInput(e.target.value)}
                   onFocus={handleChatFocus}
                   onBlur={handleChatBlur}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitChat(); } }}
                   placeholder="메시지 입력..."
                   className="flex-1 text-sm text-[#17171b] placeholder:text-[#b2b2b2] outline-none bg-transparent"
                 />
                 <button
                   type="button"
-                  className="text-[#0071ff] disabled:text-[#b2b2b2] transition-colors"
+                  onClick={submitChat}
                   disabled={!chatInput.trim()}
+                  className="text-[#0071ff] disabled:text-[#b2b2b2] transition-colors"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                     <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
@@ -232,7 +390,7 @@ export function RoomPage() {
       <div className="h-16 bg-white border-t border-[#e4e4e4] flex items-center justify-center gap-2 shrink-0 px-4">
         <ControlButton
           active={micOn}
-          onClick={() => setMicOn((v) => !v)}
+          onClick={toggleMic}
           label={micOn ? "마이크 끄기" : "마이크 켜기"}
           activeColor="bg-[#f4f6f9] text-[#17171b]"
           inactiveColor="bg-[#fff1f0] text-[#e03131]"
@@ -240,7 +398,7 @@ export function RoomPage() {
         />
         <ControlButton
           active={camOn}
-          onClick={() => setCamOn((v) => !v)}
+          onClick={toggleCam}
           label={camOn ? "카메라 끄기" : "카메라 켜기"}
           activeColor="bg-[#f4f6f9] text-[#17171b]"
           inactiveColor="bg-[#fff1f0] text-[#e03131]"
@@ -262,15 +420,39 @@ export function RoomPage() {
   );
 }
 
+function VideoTile({ stream, name }: { stream: MediaStream; name: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const hasVideo = stream.getVideoTracks().some((t) => t.enabled);
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.srcObject = stream;
+  }, [stream]);
+
+  return (
+    <div className="w-28 h-20 rounded-xl bg-white/10 border border-white/10 overflow-hidden backdrop-blur-sm">
+      {hasVideo ? (
+        <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+      ) : (
+        <>
+          <video ref={videoRef} autoPlay playsInline className="hidden" />
+          <div className="flex flex-col items-center justify-center h-full gap-1">
+            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+              <span className="text-white text-sm font-semibold">{name[0]?.toUpperCase()}</span>
+            </div>
+            <span className="text-white/50 text-[10px]">{name}</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function ControlButton({ active, onClick, label, activeColor, inactiveColor, icon }: {
   active: boolean; onClick: () => void; label: string;
   activeColor: string; inactiveColor: string; icon: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
+    <button type="button" onClick={onClick} title={label}
       className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${active ? activeColor : inactiveColor}`}
     >
       {icon}

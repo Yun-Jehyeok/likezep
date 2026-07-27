@@ -2,6 +2,7 @@ import { Router, type Router as ExpressRouter } from "express";
 import { matchMaker } from "@colyseus/core";
 import { requireAuth } from "./middleware/auth.js";
 import { findAllRooms, findPublicRooms, findRoomsForMentee } from "../db/roomRepository.js";
+import { getRecentMessages } from "../db/chatRepository.js";
 
 const router: ExpressRouter = Router();
 
@@ -30,6 +31,11 @@ router.get("/", requireAuth, async (req, res) => {
     groupId: r.groupId,
     occupants: occupantMap.get(r.id) ?? 0,
   })));
+});
+
+router.get("/:roomId/chat", requireAuth, async (req, res) => {
+  const messages = await getRecentMessages(req.params.roomId);
+  res.json(messages);
 });
 
 export { router as roomsRouter };

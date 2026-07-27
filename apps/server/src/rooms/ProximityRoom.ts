@@ -5,6 +5,7 @@ import { computeProximityChanges } from "./logic/proximity.js";
 import { config } from "../config.js";
 import { findRoomById } from "../db/roomRepository.js";
 import { logAccess } from "../db/accessLogRepository.js";
+import { saveMessage } from "../db/chatRepository.js";
 import type { AuthPayload } from "../api/middleware/auth.js";
 import type {
   MovePayload,
@@ -19,6 +20,7 @@ export class ProximityRoom extends Room<ProximityRoomState> {
   private connectedPairs = new Set<string>();
   private currentShare: { producerId: string; presenterId: string } | null = null;
   private dbRoomId = "";
+  private userNames = new Map<string, string>(); // sessionId → display name
 
   onCreate(options: { roomId?: string }) {
     this.dbRoomId = options.roomId ?? "";
@@ -60,6 +62,22 @@ export class ProximityRoom extends Room<ProximityRoomState> {
       });
     });
 
+    this.onMessage("chat", (client: Client, payload: { text?: string }) => {
+      const text = payload.text?.trim();
+      if (!text || text.length > 500) return;
+      const auth = client.auth as AuthPayload | undefined;
+      const name = this.userNames.get(client.sessionId) ?? "Unknown";
+      this.broadcast("chat", {
+        userId: auth?.userId ?? client.sessionId,
+        name,
+        text,
+        timestamp: new Date().toISOString(),
+      });
+      if (auth?.userId && this.dbRoomId) {
+        saveMessage(auth.userId, this.dbRoomId, text).catch(console.error);
+      }
+    });
+
     this.onMessage("screenshare-start", (client: Client, payload: { producerId: string }) => {
       this.currentShare = { producerId: payload.producerId, presenterId: client.sessionId };
       this.broadcast("screenshare-started", this.currentShare, { except: client });
@@ -90,9 +108,11 @@ export class ProximityRoom extends Room<ProximityRoomState> {
 
   onJoin(client: Client, options: { name?: string }) {
     const auth = client.auth as AuthPayload | undefined;
+    const displayName = options.name ?? auth?.userId ?? "Anonymous";
+    this.userNames.set(client.sessionId, displayName);
     const player = new Player();
     player.id = client.sessionId;
-    player.name = options.name ?? auth?.userId ?? "Anonymous";
+    player.name = displayName;
     player.x = 400 + (Math.random() * 100 - 50);
     player.y = 300 + (Math.random() * 100 - 50);
     this.state.players.set(client.sessionId, player);
@@ -108,6 +128,7 @@ export class ProximityRoom extends Room<ProximityRoomState> {
 
   onLeave(client: Client) {
     const auth = client.auth as AuthPayload | undefined;
+    this.userNames.delete(client.sessionId);
     if (auth?.userId && this.dbRoomId) {
       logAccess(auth.userId, this.dbRoomId, "leave").catch(console.error);
     }
