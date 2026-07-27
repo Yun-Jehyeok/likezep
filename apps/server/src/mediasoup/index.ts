@@ -81,6 +81,9 @@ mediasoupRouter.post("/consume", async (req, res) => {
       return res.status(400).json({ error: "cannot consume" });
     }
     const consumer = await transport.consume({ producerId, rtpCapabilities, paused: false });
+    if (consumer.kind === "video") {
+      consumer.requestKeyFrame().catch(() => {});
+    }
     res.json({
       id: consumer.id,
       producerId,

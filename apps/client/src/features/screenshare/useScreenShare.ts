@@ -81,6 +81,7 @@ export function useScreenShare(room: Room | null) {
 
         const consumer = await recvTransport.consume(consumeParams);
         consumerRef.current = consumer;
+        await consumer.resume();
 
         const stream = new MediaStream([consumer.track]);
         setScreenStream(stream);
