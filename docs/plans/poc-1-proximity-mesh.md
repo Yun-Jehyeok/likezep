@@ -1,5 +1,17 @@
 # PoC 1 — 근접 감지 + WebRTC Mesh 연결/해제 검증
 
+**상태**: 완료 (commit `4540500`, 2026-07-27 이전)
+
+## DoD 결과
+
+| # | 검증 항목 | 결과 |
+|---|---|---|
+| 1 | Colyseus 방에 2명 이상 입장 시 아바타 위치 실시간 동기화 | ✅ |
+| 2 | 거리 < 150px 진입 시 WebRTC 연결 + 화상 표시 | ✅ |
+| 3 | 거리 ≥ 180px 이탈 시 연결 정리 (리소스 누수 없이) | ✅ |
+| 4 | 방 나가기(탭 닫기 포함) 시 모든 연결 즉시 정리 | ✅ |
+| 5 | 3명 동시 근접 시 3-way mesh 꼬임 없이 동작 | ✅ |
+
 ## 목표
 
 아바타가 가까워지면 화상이 자동으로 붙고, 멀어지거나 방을 나가면 리소스 누수 없이 깔끔하게 끊기는지 검증.  
@@ -23,16 +35,32 @@
 - 렌더링: PixiJS 없이 plain HTML5 Canvas (사각형 아바타)
 - 이동: WASD / 방향키
 
-## 현재 상태 (착수 기준선)
+## 실제 구현된 파일
 
-완료된 것:
-- `packages/shared/src/protocol/messages.ts` — 메시지 타입 정의 완료
-- `packages/shared/src/schema/state.ts` — PlayerData / RoomStateData 인터페이스 완료
-- `apps/server/src/index.ts` — Express 기본 셸만 존재 (Colyseus 미탑재)
-- `apps/client/src/main.tsx` — Vite 진입점만 존재
-- 모노레포 스캐폴딩, lint/typecheck 파이프라인 완료
+| 파일 | 역할 |
+|---|---|
+| `apps/server/src/rooms/ProximityRoom.ts` | Colyseus Room — 위치 동기화 + WebRTC 시그널링 릴레이 |
+| `apps/server/src/rooms/logic/proximity.ts` | 근접 판정 순수 함수 (Colyseus 미의존) |
+| `apps/server/src/rooms/logic/proximity.test.ts` | 근접 판정 단위테스트 |
+| `apps/server/src/rooms/schema/RoomState.ts` | Colyseus State 스키마 (Player, RoomState) |
+| `packages/shared/src/protocol/messages.ts` | 클라-서버 메시지 타입 |
+| `apps/client/src/features/poc/GameScreen.tsx` | PoC 메인 화면 |
+| `apps/client/src/features/poc/GameCanvas.tsx` | PixiJS 캔버스 + 아바타 이동 |
+| `apps/client/src/features/poc/VideoGrid.tsx` | 근접 화상 타일 렌더링 |
+| `apps/client/src/core/webrtc/peerManager.ts` | PeerConnection Map 관리 |
+| `apps/client/src/core/webrtc/cleanup.ts` | 연결 정리 함수 (cleanupPeer, cleanupAll) |
+| `apps/client/src/core/realtime/colyseusClient.ts` | Colyseus 클라이언트 연결 래퍼 |
 
-만들어야 하는 것 — 아래 Phase별로 순서대로.
+## 핵심 설계 결정 (실제 구현 기준)
+
+- `@colyseus/schema` v3 `defineTypes()` API 사용 (Stage 3 데코레이터 미지원 우회)
+- `useDefineForClassFields: false` 가 server tsconfig에 필수
+- `WebSocketTransport maxPayload: 256 * 1024` 필요 (기본 4KB는 WebRTC SDP 크기에 부족)
+- Colyseus room name: `"poc-room"` 고정
+
+---
+
+## 원본 설계 문서 (착수 전 작성)
 
 ---
 

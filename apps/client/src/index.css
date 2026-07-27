@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Pretendard", ui-sans-serif, system-ui, sans-serif;
+
+  --color-primary: #0071ff;
+  --color-primary-hover: #0064e6;
+  --color-primary-light: #e8f1ff;
+
+  --color-surface: #ffffff;
+  --color-background: #f4f6f9;
+
+  --color-text-primary: #17171b;
+  --color-text-secondary: #767676;
+  --color-text-disabled: #b2b2b2;
+
+  --color-border: #e4e4e4;
+  --color-border-focus: #0071ff;
+}

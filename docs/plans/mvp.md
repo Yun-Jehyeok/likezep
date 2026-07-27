@@ -1,0 +1,126 @@
+# MVP 개발 계획
+
+**상태**: 진행 중
+**시작**: 2026-07-27
+
+## 현재 완료된 것 (UI 스켈레톤)
+
+React Router v6 + Zustand auth store + Tailwind CSS 기반 5개 화면 목업 (mock data, 커밋 미완료):
+
+| 화면 | 파일 | 상태 |
+|---|---|---|
+| 로그인 | `features/auth/LoginPage.tsx` | ✅ UI 완료 (Google OAuth 버튼 UI only + 개발용 빠른로그인) |
+| 배정 대기 | `features/auth/WaitingPage.tsx` | ✅ UI 완료 |
+| 로비 | `features/lobby/LobbyPage.tsx` | ✅ UI 완료 (룸 카드 그리드, 역할별 필터 mock) |
+| 룸 화면 | `features/room/RoomPage.tsx` | ✅ UI 완료 (PixiJS placeholder, 채팅 패널, 하단 컨트롤 바) |
+| 관리 대시보드 | `features/admin/AdminPage.tsx` | ✅ UI 완료 (실시간현황/그룹관리/접속로그 탭) |
+
+공통 인프라:
+- `apps/client/src/app/store.ts` — Zustand auth store (user: id/name/email/role/groupId)
+- `apps/client/src/app/router.tsx` — RequireAuth, RequireAdmin guard 컴포넌트
+- `apps/client/src/index.css` — Tailwind CSS v4 import
+- `apps/client/vite.config.ts` — @tailwindcss/vite 플러그인 추가
+
+---
+
+## MVP 개발 순서
+
+UI-first 전략: mock data → 실제 API/실시간 연결 순서로 진행.
+
+### Phase 1: DB + Auth (백엔드 기반)
+
+목표: 실제 유저 데이터로 로그인/로비가 동작하게.
+
+| 작업 | 파일 | 비고 |
+|---|---|---|
+| PostgreSQL Docker 컨테이너 설정 | `infra/docker-compose.dev.yml` | |
+| Prisma 스키마 작성 | `apps/server/src/db/schema.prisma` | docs/db-schema.md 기반 |
+| 마이그레이션 + 시드 | `apps/server/src/db/seed.ts` | 공용 룸 2개 (광장, 회의실) |
+| Google OAuth 연동 | `apps/server/src/api/auth.ts` | `POST /api/auth/google` |
+| JWT 발급/검증 미들웨어 | `apps/server/src/api/middleware/auth.ts` | |
+| `GET /api/me` | `apps/server/src/api/auth.ts` | 배정 대기 폴링용 |
+| 클라이언트 Google OAuth 버튼 연결 | `features/auth/LoginPage.tsx` | mock 제거 |
+
+### Phase 2: 룸 목록 + Colyseus 연동
+
+목표: 로비에서 실제 룸 데이터 표시, 룸 입장 시 Colyseus 연결.
+
+| 작업 | 파일 | 비고 |
+|---|---|---|
+| `GET /api/rooms` | `apps/server/src/api/rooms.ts` | role/groupId 기반 필터링 |
+| 로비 API 연결 | `features/lobby/LobbyPage.tsx` | mock 제거 |
+| Colyseus auth 연동 | `apps/server/src/rooms/ProximityRoom.ts` | `onAuth` JWT 검증 + 권한 체크 |
+| 룸 입장 JWT 전달 | `core/realtime/colyseusClient.ts` | `joinById(roomId, { token })` |
+| access_logs 기록 | `ProximityRoom.ts` | onJoin/onLeave → DB INSERT |
+
+### Phase 3: PixiJS 맵 + 아바타
+
+목표: 룸 화면에 실제 맵과 이동 가능한 아바타.
+
+| 작업 | 파일 | 비고 |
+|---|---|---|
+| PixiJS Application 마운트 | `features/room/RoomPage.tsx` | useRef로 캔버스 마운트 |
+| 맵 로딩 (Tiled) | `game/world/mapLoader.ts` | 초기엔 단순 배경으로 시작 가능 |
+| 아바타 엔티티 | `game/entities/Avatar.ts` | 고정 스프라이트 (1단계) |
+| WASD 입력 | `game/input/keyboard.ts` | 채팅 포커스 시 비활성 |
+| 서버 위치 동기화 연결 | `ProximityRoom.ts` ↔ `RoomPage` | 기존 PoC 1 로직 재사용 |
+
+### Phase 4: 근접 화상 + 채팅
+
+목표: 룸 화면에서 근접 인원과 화상 자동 연결, 채팅 동작.
+
+| 작업 | 파일 | 비고 |
+|---|---|---|
+| 근접 화상 타일 UI | `features/room/RoomPage.tsx` | VideoGrid PoC 컴포넌트 통합 |
+| 근접 화상 로직 연결 | `core/webrtc/peerManager.ts` | PoC 1 로직 그대로 재사용 |
+| 채팅 UI 연결 | `features/room/RoomPage.tsx` | Colyseus `chat` 메시지 |
+| `GET /api/rooms/:roomId/chat` | `apps/server/src/api/rooms.ts` | 입장 시 최근 50개 로드 |
+| 채팅 DB 저장 | `ProximityRoom.ts` | 브로드캐스트 + 비동기 INSERT |
+
+### Phase 5: 화면공유 + 방 스위처
+
+목표: 멘토/Admin의 화면공유, 방 전환 기능.
+
+| 작업 | 파일 | 비고 |
+|---|---|---|
+| 화면공유 UI 통합 | `features/room/RoomPage.tsx` | ScreenShareButton/View PoC 컴포넌트 재사용 |
+| 화면공유 시청 오버레이 | `features/room/ScreenShareOverlay.tsx` | |
+| 방 스위처 드롭다운 | `features/room/RoomSwitcher.tsx` | 멘토/Admin 전용 |
+| 방 전환 리소스 정리 | `core/webrtc/cleanup.ts` | cleanupAll + Colyseus leave → 새 룸 join |
+
+### Phase 6: 관리 대시보드 연동
+
+목표: AdminPage mock → 실제 API 데이터.
+
+| 작업 | 파일 | 비고 |
+|---|---|---|
+| `GET /api/admin/status` | `apps/server/src/api/admin.ts` | Colyseus room listing 연동 |
+| `GET /api/admin/users` | `apps/server/src/api/admin.ts` | |
+| `PATCH /api/admin/users/:id` | `apps/server/src/api/admin.ts` | 역할/그룹 변경 |
+| `POST /api/admin/groups` | `apps/server/src/api/admin.ts` | 그룹 + 프라이빗 룸 자동 생성 |
+| `GET /api/admin/logs` | `apps/server/src/api/admin.ts` | access_logs 조회 |
+| AdminPage API 연결 | `features/admin/AdminPage.tsx` | mock 제거 |
+
+---
+
+## 파일럿 전 체크리스트
+
+- [ ] Google OAuth 실제 계정으로 로그인 가능
+- [ ] 멘티 최초 로그인 → 배정 대기 화면 → 관리자가 그룹 배정 → 로비 입장
+- [ ] 멘티가 타 그룹 룸 URL 직접 입력 시 차단
+- [ ] 멘토/Admin이 전체 룸 접근 가능
+- [ ] 근접 화상: 3명 이상 테스트
+- [ ] 화면공유: 멘토 1명 → 멘티 5명 이상 시청
+- [ ] 방 스위처: 멘토가 탭 새로고침 없이 룸 전환
+- [ ] 관리 대시보드: 실시간 접속 현황 폴링
+- [ ] `pnpm check` 통과
+- [ ] EC2 배포 후 실제 네트워크에서 TURN 릴레이 확인
+
+---
+
+## 기술 결정 사항
+
+- **UI-first**: mock data로 UI 완성 → API 연결 순서 (DB 없이 화면 먼저 검증)
+- **PoC 코드 재사용**: `proximity.ts`, `peerManager.ts`, `cleanup.ts`, `useScreenShare.ts` — MVP에서 그대로 사용, 리팩토링은 필요할 때만
+- **브랜치 전략**: MVP 이후 feature branch → main merge (CLAUDE.md 참조)
+- **commit 단위**: Phase 완료마다 커밋 (Phase 1 완료 = 1커밋)

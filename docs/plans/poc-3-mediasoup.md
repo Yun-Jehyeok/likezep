@@ -1,5 +1,70 @@
 # PoC 3 — mediasoup 기반 화면공유 포워딩
 
+**상태**: 완료 (commits `2962063` → `6f8761a`, 2026-07-27)
+**EC2 DoD**: 5개 항목 전부 통과
+
+## DoD 결과
+
+| # | 검증 항목 | 결과 |
+|---|---|---|
+| 1 | mediasoup Worker/Router EC2에서 정상 기동 | ✅ |
+| 2 | 발표자 화면공유 스트림 Produce 성공 | ✅ (브라우저 콘솔 `producer.id` 확인) |
+| 3 | 시청자 1명 Consume → 화면 수신 | ✅ |
+| 4 | 시청자 3명 이상 동시 Consume → 모두 화면 수신 | ✅ |
+| 5 | 발표자 퇴장 시 시청자 화면 중단 | ✅ |
+
+## 삽질 기록 (실제 발생한 이슈들)
+
+실제 구현 및 EC2 배포 과정에서 해결한 문제들. 다음 번 작업 시 참고용.
+
+### 1. `preferredPayloadType` 런타임 에러
+- **증상**: `"duplicated codec.preferredPayloadType"` 에러로 서버 크래시
+- **원인**: `MEDIA_CODECS`에 `preferredPayloadType` 명시 시 mediasoup 내부에서 중복 처리
+- **해결**: 해당 필드 제거, `as RtpCodecCapability[]` 캐스팅으로 TS 에러 우회
+
+### 2. `import * as mediasoup` 필수
+- **증상**: `mediasoup.createWorker is not a function`
+- **원인**: `import mediasoup from "mediasoup"` (default import) 시 undefined
+- **해결**: `import * as mediasoup from "mediasoup"`
+
+### 3. tsx는 `.env` 자동 로드 안 함
+- **증상**: EC2에서 `announcedIp=127.0.0.1`로 고정 → 외부 transport 연결 실패
+- **원인**: tsx가 `.env` 파일을 자동으로 읽지 않음
+- **해결**: `ecosystem.config.cjs`의 `env_file: "apps/server/.env"` 옵션으로 해결
+
+### 4. 검은 화면 (Black Screen)
+여러 원인이 복합적으로 작용함. 해결 순서:
+1. **`consumer.resume()` 누락** — 클라이언트에서 `transport.consume()` 후 반드시 호출 필요
+2. **`consumer.requestKeyFrame()` 누락** — 서버에서 consumer 생성 직후 호출 (VP8 키프레임 요청)
+3. **신규 입장자 놓침** — `currentShare` 상태를 Colyseus Room에 저장, `onJoin`에서 재전송
+4. **`MEDIASOUP_ANNOUNCED_IP` 미로드** — 위 항목 3번의 근본 원인, transport connectionState: failed
+
+### 5. EC2 디스크 부족 (ENOSPC)
+- mediasoup 빌드 중 디스크 풀
+- **해결**: `sudo apt-get clean` + `rm -rf /usr/src/linux-headers*` + `pnpm store prune`
+
+### 6. Colyseus 신규 입장자 화면공유 재전송
+- **문제**: 화면공유 중 입장한 유저는 `screenshare-started` 이벤트를 놓침
+- **해결**: `ProximityRoom`에 `currentShare: { producerId, presenterId } | null` 저장, `onJoin`에서 재전송
+
+### 7. presenter 비정상 퇴장 처리
+- `onLeave`에서 퇴장 플레이어가 presenter면 `screenshare-stopped` 브로드캐스트
+
+## 실제 구현된 파일
+
+| 파일 | 역할 |
+|---|---|
+| `apps/server/src/mediasoup/worker.ts` | Worker 싱글턴 |
+| `apps/server/src/mediasoup/router.ts` | Router 생성/캐싱 |
+| `apps/server/src/mediasoup/transport.ts` | WebRtcTransport 헬퍼 |
+| `apps/server/src/mediasoup/index.ts` | Express 라우터 (5개 엔드포인트) |
+| `apps/client/src/features/screenshare/useScreenShare.ts` | 발표자/시청자 mediasoup-client 로직 |
+| `apps/client/src/features/screenshare/ScreenShareButton.tsx` | 공유 시작/중단 버튼 |
+| `apps/client/src/features/screenshare/ScreenShareView.tsx` | 시청자 화면 표시 |
+| `ecosystem.config.cjs` (리포 루트) | pm2 + env_file 설정 |
+
+---
+
 ## 목표
 
 발표자 1명의 화면공유 스트림을 mediasoup SFU가 수신하고, N명의 시청자에게 동시에 포워딩하는 것을 검증.
