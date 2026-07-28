@@ -9,11 +9,16 @@ ZEP 대체 자체 멘토링 플랫폼. 핵심 목표: 멀티룸 동시 관리 �
 - 아키텍처 규칙: docs/architecture.md
 - 현재 작업 단계: docs/plans/mvp.md
 
-## 현재 단계: MVP 개발 (PoC 1~3 완료)
-- PoC 1 (근접 화상 Mesh) — 완료 commit `4540500`
-- PoC 2 (coturn TURN relay) — 완료 commit `100c1f1`
-- PoC 3 (mediasoup SFU 화면공유) — 완료 commit `6f8761a`
-- MVP UI 스켈레톤 (Tailwind + mock data) — 구현 완료, 미커밋
+## 현재 단계: MVP 개발 (Phase 1~6 완료, 파일럿 전 체크리스트 진행 예정)
+- PoC 1 (근접 화상 Mesh) — 완료 `4540500`
+- PoC 2 (coturn TURN relay) — 완료 `100c1f1`
+- PoC 3 (mediasoup SFU 화면공유) — 완료 `6f8761a`
+- MVP Phase 1 (DB + Google OAuth + JWT) — 완료 `3bd8dbb`
+- MVP Phase 2 (룸 목록 API + Colyseus auth) — 완료 `a4dfede`
+- MVP Phase 3 (PixiJS 맵 + 아바타 + WASD) — 완료 `79c926b`
+- MVP Phase 4 (근접 화상 + 채팅) — 완료 `e517807`
+- MVP Phase 5 (화면공유 + 방 스위처) — 완료 `71d870d`
+- MVP Phase 6 (관리 대시보드 API 연결) — 완료 (커밋 예정)
 
 ## 절대 규칙 (위반 시 CI 실패)
 - `client/game/`은 React를 import하지 않는다

@@ -1,7 +1,12 @@
+import { RoomType } from "@prisma/client";
 import { prisma } from "./client.js";
 
 export async function findRoomById(id: string) {
   return prisma.room.findUnique({ where: { id } });
+}
+
+export async function createRoom(data: { name: string; type: RoomType; groupId?: string; mapKey?: string }) {
+  return prisma.room.create({ data: { mapKey: "default", ...data } });
 }
 
 export async function findAllRooms() {

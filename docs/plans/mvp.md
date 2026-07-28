@@ -1,7 +1,9 @@
 # MVP 개발 계획
 
-**상태**: 진행 중
+**상태**: Phase 6 완료
 **시작**: 2026-07-27
+**Phase 1~5 완료**: 2026-07-27
+**Phase 6 완료**: 2026-07-28
 
 ## 현재 완료된 것 (UI 스켈레톤)
 
@@ -27,7 +29,7 @@ React Router v6 + Zustand auth store + Tailwind CSS 기반 5개 화면 목업 (m
 
 UI-first 전략: mock data → 실제 API/실시간 연결 순서로 진행.
 
-### Phase 1: DB + Auth (백엔드 기반)
+### Phase 1: DB + Auth (백엔드 기반) ✅ `3bd8dbb`
 
 목표: 실제 유저 데이터로 로그인/로비가 동작하게.
 
@@ -41,7 +43,7 @@ UI-first 전략: mock data → 실제 API/실시간 연결 순서로 진행.
 | `GET /api/me` | `apps/server/src/api/auth.ts` | 배정 대기 폴링용 |
 | 클라이언트 Google OAuth 버튼 연결 | `features/auth/LoginPage.tsx` | mock 제거 |
 
-### Phase 2: 룸 목록 + Colyseus 연동
+### Phase 2: 룸 목록 + Colyseus 연동 ✅ `a4dfede`
 
 목표: 로비에서 실제 룸 데이터 표시, 룸 입장 시 Colyseus 연결.
 
@@ -53,7 +55,7 @@ UI-first 전략: mock data → 실제 API/실시간 연결 순서로 진행.
 | 룸 입장 JWT 전달 | `core/realtime/colyseusClient.ts` | `joinById(roomId, { token })` |
 | access_logs 기록 | `ProximityRoom.ts` | onJoin/onLeave → DB INSERT |
 
-### Phase 3: PixiJS 맵 + 아바타
+### Phase 3: PixiJS 맵 + 아바타 ✅ `79c926b`
 
 목표: 룸 화면에 실제 맵과 이동 가능한 아바타.
 
@@ -65,7 +67,7 @@ UI-first 전략: mock data → 실제 API/실시간 연결 순서로 진행.
 | WASD 입력 | `game/input/keyboard.ts` | 채팅 포커스 시 비활성 |
 | 서버 위치 동기화 연결 | `ProximityRoom.ts` ↔ `RoomPage` | 기존 PoC 1 로직 재사용 |
 
-### Phase 4: 근접 화상 + 채팅
+### Phase 4: 근접 화상 + 채팅 ✅ `e517807`
 
 목표: 룸 화면에서 근접 인원과 화상 자동 연결, 채팅 동작.
 
@@ -77,7 +79,7 @@ UI-first 전략: mock data → 실제 API/실시간 연결 순서로 진행.
 | `GET /api/rooms/:roomId/chat` | `apps/server/src/api/rooms.ts` | 입장 시 최근 50개 로드 |
 | 채팅 DB 저장 | `ProximityRoom.ts` | 브로드캐스트 + 비동기 INSERT |
 
-### Phase 5: 화면공유 + 방 스위처
+### Phase 5: 화면공유 + 방 스위처 ✅ `71d870d`
 
 목표: 멘토/Admin의 화면공유, 방 전환 기능.
 
@@ -88,18 +90,19 @@ UI-first 전략: mock data → 실제 API/실시간 연결 순서로 진행.
 | 방 스위처 드롭다운 | `features/room/RoomSwitcher.tsx` | 멘토/Admin 전용 |
 | 방 전환 리소스 정리 | `core/webrtc/cleanup.ts` | cleanupAll + Colyseus leave → 새 룸 join |
 
-### Phase 6: 관리 대시보드 연동
+### Phase 6: 관리 대시보드 연동 ✅ (Phase 7 커밋 예정)
 
 목표: AdminPage mock → 실제 API 데이터.
 
 | 작업 | 파일 | 비고 |
 |---|---|---|
-| `GET /api/admin/status` | `apps/server/src/api/admin.ts` | Colyseus room listing 연동 |
-| `GET /api/admin/users` | `apps/server/src/api/admin.ts` | |
-| `PATCH /api/admin/users/:id` | `apps/server/src/api/admin.ts` | 역할/그룹 변경 |
-| `POST /api/admin/groups` | `apps/server/src/api/admin.ts` | 그룹 + 프라이빗 룸 자동 생성 |
-| `GET /api/admin/logs` | `apps/server/src/api/admin.ts` | access_logs 조회 |
-| AdminPage API 연결 | `features/admin/AdminPage.tsx` | mock 제거 |
+| `GET /api/admin/status` | `apps/server/src/api/admin.ts` | Colyseus room listing + access_logs 연동 |
+| `GET /api/admin/users` | `apps/server/src/api/admin.ts` | ✅ |
+| `GET /api/admin/groups` | `apps/server/src/api/admin.ts` | ✅ (UI 드롭다운용 추가) |
+| `PATCH /api/admin/users/:id` | `apps/server/src/api/admin.ts` | ✅ 역할/그룹 변경 |
+| `POST /api/admin/groups` | `apps/server/src/api/admin.ts` | ✅ 그룹 + 프라이빗 룸 자동 생성 |
+| `GET /api/admin/logs` | `apps/server/src/api/admin.ts` | ✅ access_logs 조회 |
+| AdminPage API 연결 | `features/admin/AdminPage.tsx` | ✅ mock 제거, 인라인 역할/그룹 편집 추가 |
 
 ---
 
@@ -117,6 +120,15 @@ UI-first 전략: mock data → 실제 API/실시간 연결 순서로 진행.
 - [ ] EC2 배포 후 실제 네트워크에서 TURN 릴레이 확인
 
 ---
+
+## Phase 1~5 완료 중 발견한 버그/결정사항
+
+- **Colyseus 예약어**: `filterBy(["roomId"])` 금지. `roomId`는 Colyseus 내부 옵션명 → `dbRoomId` 사용
+- **방 전환 상태 초기화**: `occupants`, `messages`, `remotePeers`는 effect 재실행 시 명시적으로 초기화 필요
+- **WebGL 재초기화**: canvas에 `key={roomId}` → 방 전환 시 React가 새 DOM 노드 생성, 컨텍스트 충돌 방지
+- **WebRTC renegotiation**: offerer/answerer 구분 없이 양방향 offer 생성 허용. `onWebRtcOffer`에서 기존 PC 있으면 재협상으로 처리
+- **카메라 후발 활성화**: 근접 연결 후 카메라 켜도 `addTrackToPeer` + offer 재전송으로 영상 전송 가능
+- **onPlayerLeave 중복 방어**: `playerNamesRef.has(sessionId)` 체크로 중복 호출 시 early return
 
 ## 기술 결정 사항
 

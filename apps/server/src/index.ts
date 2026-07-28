@@ -8,6 +8,7 @@ import { mediasoupRouter } from "./mediasoup/index.js";
 import { getWorker } from "./mediasoup/worker.js";
 import { authRouter } from "./api/auth.js";
 import { roomsRouter } from "./api/rooms.js";
+import { adminRouter } from "./api/admin.js";
 import { config } from "./config.js";
 
 const app = express();
@@ -23,6 +24,7 @@ app.options("*", (_req, res) => res.sendStatus(204));
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRouter);
 app.use("/api/rooms", roomsRouter);
+app.use("/api/admin", adminRouter);
 app.use("/ms", mediasoupRouter);
 
 app.get("/turn-credentials", (_req, res) => {
