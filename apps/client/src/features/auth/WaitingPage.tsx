@@ -1,9 +1,26 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../app/store.js";
+import { api } from "../../core/api/client.js";
 
 export function WaitingPage() {
-  const { user, clearAuth } = useAuthStore();
+  const { user, updateUser, clearAuth } = useAuthStore();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const poll = setInterval(async () => {
+      try {
+        const me = await api.get<{ id: string; name: string; role: string; groupId: string | null }>("/api/me");
+        if (me.groupId) {
+          updateUser({ groupId: me.groupId });
+          navigate("/lobby", { replace: true });
+        }
+      } catch {
+        // 폴링 실패는 조용히 무시
+      }
+    }, 3000);
+    return () => clearInterval(poll);
+  }, [navigate, updateUser]);
 
   function handleLogout() {
     clearAuth();
@@ -33,23 +50,19 @@ export function WaitingPage() {
             </p>
           </div>
 
-          {/* 배정 확인 버튼 */}
-          <div className="w-full flex flex-col gap-3">
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="w-full h-12 rounded-xl bg-[#0071ff] hover:bg-[#0064e6] active:bg-[#0058cc] text-white text-[15px] font-semibold transition-colors"
-            >
-              배정 확인
-            </button>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="w-full h-11 rounded-xl text-[#767676] text-sm font-medium hover:bg-[#f4f6f9] transition-colors"
-            >
-              로그아웃
-            </button>
+          {/* 배정 확인 중 인디케이터 */}
+          <div className="flex items-center gap-2 text-sm text-[#b2b2b2]">
+            <span className="w-3.5 h-3.5 border-2 border-[#e4e4e4] border-t-[#0071ff] rounded-full animate-spin shrink-0" />
+            배정 확인 중...
           </div>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full h-11 rounded-xl text-[#767676] text-sm font-medium hover:bg-[#f4f6f9] transition-colors"
+          >
+            로그아웃
+          </button>
         </div>
 
         <p className="text-center text-[11px] text-[#b2b2b2] mt-6">

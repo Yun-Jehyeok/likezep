@@ -30,7 +30,6 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   function handleAuthSuccess(user: AuthResponse["user"], token: string) {
-    sessionStorage.setItem("auth_token", token);
     setAuth(user, token);
     if (user.role === "mentee" && !user.groupId) {
       navigate("/waiting");

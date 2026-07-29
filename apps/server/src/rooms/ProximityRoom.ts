@@ -4,6 +4,7 @@ import { Player, ProximityRoomState } from "./schema/RoomState.js";
 import { computeProximityChanges } from "./logic/proximity.js";
 import { config } from "../config.js";
 import { findRoomById } from "../db/roomRepository.js";
+import { findUserById } from "../db/userRepository.js";
 import { logAccess } from "../db/accessLogRepository.js";
 import { saveMessage } from "../db/chatRepository.js";
 import type { AuthPayload } from "../api/middleware/auth.js";
@@ -96,9 +97,13 @@ export class ProximityRoom extends Room<ProximityRoomState> {
     const payload = jwt.verify(token, config.JWT_SECRET) as AuthPayload;
 
     if (dbRoomId) {
-      const room = await findRoomById(dbRoomId);
+      const [room, user] = await Promise.all([
+        findRoomById(dbRoomId),
+        findUserById(payload.userId),
+      ]);
       if (!room) throw new Error("Room not found");
-      if (room.type === "private" && payload.role === "mentee" && payload.groupId !== room.groupId) {
+      // DB의 최신 groupId 기준으로 체크 (JWT는 배정 후 갱신 안 됨)
+      if (room.type === "private" && user?.role === "mentee" && user.groupId !== room.groupId) {
         throw new Error("Access denied");
       }
     }
