@@ -5,6 +5,19 @@ dist/
 .pnpm-store/
 pnpm-lock.yaml
 
+# TypeScript 빌드 캐시
+*.tsbuildinfo
+
+# 로그
+*.log
+_*.log
+
+# Claude Code 내부 파일
+.claude/
+
+# 개인 학습/작업 문서
+docs/study.md
+
 # Prisma
 prisma/migrations/*.sql.bak
 

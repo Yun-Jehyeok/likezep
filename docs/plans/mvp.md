@@ -108,16 +108,64 @@ UI-first 전략: mock data → 실제 API/실시간 연결 순서로 진행.
 
 ## 파일럿 전 체크리스트
 
-- [ ] Google OAuth 실제 계정으로 로그인 가능
-- [ ] 멘티 최초 로그인 → 배정 대기 화면 → 관리자가 그룹 배정 → 로비 입장
-- [ ] 멘티가 타 그룹 룸 URL 직접 입력 시 차단
-- [ ] 멘토/Admin이 전체 룸 접근 가능
+- [x] Google OAuth 실제 계정으로 로그인 가능 (`e46f8c6` — 도메인 + HTTPS + Google Cloud Console 설정 완료, 2026-07-30)
+- [x] 멘티 최초 로그인 → 배정 대기 화면 → 관리자가 그룹 배정 → 로비 자동 진입 (`8c572f6`)
+- [x] 멘티가 타 그룹 룸 URL 직접 입력 시 차단 (`8c572f6` — RequireAssigned + ProximityRoom DB 권한 체크)
+- [ ] 멘토/Admin이 전체 룸 접근 가능 (코드 완료, 실 테스트 필요)
 - [ ] 근접 화상: 3명 이상 테스트
 - [ ] 화면공유: 멘토 1명 → 멘티 5명 이상 시청
 - [ ] 방 스위처: 멘토가 탭 새로고침 없이 룸 전환
-- [ ] 관리 대시보드: 실시간 접속 현황 폴링
-- [ ] `pnpm check` 통과
+- [ ] 관리 대시보드: 실시간 접속 현황 폴링 (코드 완료, 실 테스트 필요)
+- [x] 관리 대시보드: 그룹 수정/삭제 기능 (`e46f8c6` — PATCH/DELETE /api/admin/groups/:id)
+- [x] `pnpm check` 통과 (2026-07-30)
 - [ ] EC2 배포 후 실제 네트워크에서 TURN 릴레이 확인
+- [ ] mock 로그인 제거 (파일럿 직전)
+
+### 도메인 + HTTPS 설정 완료 (2026-07-30)
+
+- **도메인**: `like-zep.shop` (www 포함)
+- **EC2 퍼블릭 IP**: `13.125.127.128`
+- **HTTPS**: Let's Encrypt certbot, 인증서 위치 `/etc/letsencrypt/live/like-zep.shop/`
+- **nginx**: `/etc/nginx/sites-available/likezep`
+- **접속 URL**: `https://like-zep.shop`
+
+### nginx 라우팅 구조 (중요)
+
+Colyseus WebSocket 연결이 클라이언트(3000)가 아닌 서버(2567)로 가야 하므로 `map` 지시어로 분기:
+
+```nginx
+map $http_upgrade $game_upstream {
+    "websocket"  http://127.0.0.1:2567;
+    default      http://127.0.0.1:3000;
+}
+```
+
+- `/matchmake/*` → 2567 (Colyseus HTTP 매치메이킹)
+- `/api/*`, `/ms/*`, `/turn-credentials` → 2567 (REST + mediasoup + TURN)
+- `/` HTTP → 3000 (React 클라이언트), WebSocket → 2567 (Colyseus)
+
+**주의**: `proxy_pass`에 변수 사용 시 `localhost` 대신 `127.0.0.1` 필수 (DNS resolver 미설정 에러 방지)
+
+### PostgreSQL EC2 직접 설치 (Docker 없음)
+
+```bash
+sudo apt install -y postgresql postgresql-contrib
+sudo -u postgres psql -c "CREATE USER dev WITH PASSWORD 'dev';"
+sudo -u postgres psql -c "CREATE DATABASE mentoring OWNER dev;"
+pnpm --filter @mentoring/server exec prisma generate
+pnpm --filter @mentoring/server exec prisma migrate deploy
+pnpm --filter @mentoring/server exec prisma db seed
+```
+
+### Google Cloud Console 설정
+
+- **승인된 JavaScript 출처**: `https://like-zep.shop`, `https://www.like-zep.shop`
+- **승인된 리디렉션 URI**: `https://like-zep.shop/api/auth/google/callback`
+
+### EC2 .env 현황 (2026-07-30 기준)
+
+- `apps/server/.env`: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ADMIN_EMAIL`, `JWT_SECRET`, `DATABASE_URL=postgresql://dev:dev@localhost:5432/mentoring`, TURN/mediasoup 설정 완료
+- `apps/client/.env`: `VITE_GOOGLE_CLIENT_ID`, `VITE_API_URL=https://like-zep.shop`, `VITE_SERVER_URL=https://like-zep.shop` 설정 완료
 
 ---
 
