@@ -15,8 +15,10 @@ _*.log
 # Claude Code 내부 파일
 .claude/
 
-# 개인 학습/작업 문서
-docs/study.md
+# 문서 (README.md만 예외)
+docs/
+*.md
+!README.md
 
 # Prisma
 prisma/migrations/*.sql.bak
