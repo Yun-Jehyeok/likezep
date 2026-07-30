@@ -56,6 +56,8 @@ export function AdminPage() {
   const [tab, setTab] = useState<Tab>("status");
   const [groupInput, setGroupInput] = useState("");
   const [creating, setCreating] = useState(false);
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editingGroupName, setEditingGroupName] = useState("");
 
   const [statusList, setStatusList] = useState<RoomStatus[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -121,6 +123,21 @@ export function AdminPage() {
     } finally {
       setCreating(false);
     }
+  }
+
+  async function handleRenameGroup(groupId: string) {
+    if (!editingGroupName.trim()) return;
+    const updated = await api.patch<Group>(`/api/admin/groups/${groupId}`, { name: editingGroupName.trim() });
+    setGroups((prev) => prev.map((g) => (g.id === groupId ? updated : g)));
+    setUsers((prev) => prev.map((u) => (u.groupId === groupId ? { ...u, groupName: updated.name } : u)));
+    setEditingGroupId(null);
+  }
+
+  async function handleDeleteGroup(groupId: string, groupName: string) {
+    if (!window.confirm(`"${groupName}" 그룹을 삭제하면 소속 유저가 미배정 상태가 됩니다. 계속할까요?`)) return;
+    await api.delete(`/api/admin/groups/${groupId}`);
+    setGroups((prev) => prev.filter((g) => g.id !== groupId));
+    setUsers((prev) => prev.map((u) => (u.groupId === groupId ? { ...u, groupId: null, groupName: null } : u)));
   }
 
   async function handleUserChange(userId: string, field: "role" | "groupId", value: string) {
@@ -243,6 +260,57 @@ export function AdminPage() {
                   {creating ? "생성 중..." : "생성"}
                 </button>
               </div>
+            </div>
+
+            {/* 그룹 목록 */}
+            <div className="bg-white rounded-2xl border border-[#e4e4e4] overflow-hidden">
+              <div className="px-5 py-4 border-b border-[#f4f6f9]">
+                <h3 className="text-sm font-semibold text-[#17171b]">그룹 목록</h3>
+              </div>
+              {groups.length === 0 ? (
+                <p className="px-5 py-4 text-sm text-[#b2b2b2]">생성된 그룹 없음</p>
+              ) : (
+                <ul className="divide-y divide-[#f4f6f9]">
+                  {groups.map((g) => (
+                    <li key={g.id} className="px-5 py-3 flex items-center gap-3">
+                      {editingGroupId === g.id ? (
+                        <>
+                          <input
+                            autoFocus
+                            value={editingGroupName}
+                            onChange={(e) => setEditingGroupName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleRenameGroup(g.id);
+                              if (e.key === "Escape") setEditingGroupId(null);
+                            }}
+                            className="flex-1 h-8 px-2 rounded-lg border border-[#0071ff] text-sm text-[#17171b] outline-none"
+                          />
+                          <button type="button" onClick={() => handleRenameGroup(g.id)} className="text-xs text-[#0071ff] font-medium">저장</button>
+                          <button type="button" onClick={() => setEditingGroupId(null)} className="text-xs text-[#767676]">취소</button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="flex-1 text-sm text-[#17171b]">{g.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => { setEditingGroupId(g.id); setEditingGroupName(g.name); }}
+                            className="text-xs text-[#767676] hover:text-[#17171b] transition-colors"
+                          >
+                            수정
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteGroup(g.id, g.name)}
+                            className="text-xs text-[#e05c00] hover:text-red-600 transition-colors"
+                          >
+                            삭제
+                          </button>
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             {/* 유저 테이블 */}

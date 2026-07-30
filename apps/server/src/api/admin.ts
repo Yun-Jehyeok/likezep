@@ -4,7 +4,7 @@ import type { Role } from "@prisma/client";
 import { requireAuth, requireAdmin } from "./middleware/auth.js";
 import { findAllRooms, createRoom } from "../db/roomRepository.js";
 import { findAllUsers, updateUser } from "../db/userRepository.js";
-import { findAllGroups, createGroup } from "../db/groupRepository.js";
+import { findAllGroups, createGroup, updateGroup, deleteGroup } from "../db/groupRepository.js";
 import { getActiveOccupants, getRecentLogs } from "../db/accessLogRepository.js";
 
 const router: ExpressRouter = Router();
@@ -79,6 +79,23 @@ router.post("/groups", requireAuth, requireAdmin, async (req, res) => {
   const group = await createGroup(trimmed);
   const room = await createRoom({ name: `${trimmed} 룸`, type: "private", groupId: group.id });
   res.status(201).json({ group: { id: group.id, name: group.name }, room: { id: room.id, name: room.name } });
+});
+
+// PATCH /api/admin/groups/:id — 그룹 이름 변경
+router.patch("/groups/:id", requireAuth, requireAdmin, async (req, res) => {
+  const { name } = req.body as { name?: string };
+  if (!name?.trim()) {
+    res.status(422).json({ error: { code: "VALIDATION_ERROR", message: "name required" } });
+    return;
+  }
+  const group = await updateGroup(req.params.id, name.trim());
+  res.json({ id: group.id, name: group.name });
+});
+
+// DELETE /api/admin/groups/:id — 그룹 삭제 (유저 미배정, 룸/채팅/로그 삭제)
+router.delete("/groups/:id", requireAuth, requireAdmin, async (req, res) => {
+  await deleteGroup(req.params.id);
+  res.status(204).end();
 });
 
 // GET /api/admin/logs — 접속 로그 (최근 100개)
