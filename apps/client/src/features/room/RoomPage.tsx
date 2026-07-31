@@ -287,6 +287,36 @@ export function RoomPage() {
 
   const remotePeerList = Object.entries(remotePeers);
 
+  if (connError) {
+    const isAccessDenied = connError.toLowerCase().includes("access denied") || connError.includes("Access denied");
+    return (
+      <div className="h-screen flex items-center justify-center bg-[#f4f6f9] font-[Pretendard,sans-serif]">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-sm w-full mx-4 text-center">
+          <div className="w-14 h-14 rounded-full bg-[#fff1f0] flex items-center justify-center mx-auto mb-4">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+              <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="#e03131" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <h2 className="text-lg font-bold text-[#17171b] mb-2">
+            {isAccessDenied ? "접근 권한 없음" : "연결 실패"}
+          </h2>
+          <p className="text-sm text-[#767676] mb-6 leading-relaxed">
+            {isAccessDenied
+              ? "배정된 그룹의 룸에만 입장할 수 있습니다.\n다른 그룹의 룸에는 접근할 수 없습니다."
+              : "룸 연결에 실패했습니다.\n잠시 후 다시 시도해 주세요."}
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate("/lobby")}
+            className="w-full h-11 bg-[#0071ff] hover:bg-[#0064e6] text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            확인
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen flex flex-col font-[Pretendard,sans-serif]">
 
@@ -305,10 +335,8 @@ export function RoomPage() {
           <div className="w-px h-4 bg-[#e4e4e4]" />
           <span className="text-[15px] font-semibold text-[#17171b]">{roomName}</span>
           <div className="flex items-center gap-1.5">
-            <span className={`w-1.5 h-1.5 rounded-full ${connError ? "bg-[#e03131]" : "bg-[#22c55e]"}`} />
-            <span className="text-sm text-[#767676]">
-              {connError ? "연결 실패" : `${occupants}명 접속 중`}
-            </span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />
+            <span className="text-sm text-[#767676]">{occupants}명 접속 중</span>
           </div>
         </div>
 
@@ -332,15 +360,6 @@ export function RoomPage() {
         {/* 게임 캔버스 */}
         <div className="flex-1 relative">
           <canvas key={roomId} ref={canvasRef} className="absolute inset-0 w-full h-full" />
-
-          {connError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-[#12121a]">
-              <div className="text-center">
-                <p className="text-red-400 text-sm font-medium mb-1">연결 오류</p>
-                <p className="text-white/40 text-xs">{connError}</p>
-              </div>
-            </div>
-          )}
 
           {/* 근접 화상 타일 */}
           {remotePeerList.length > 0 && (
