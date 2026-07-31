@@ -12,7 +12,7 @@ export async function getRecentMessages(roomId: string, limit = 50) {
     take: limit,
   });
   return msgs.reverse().map((m) => ({
-    id: m.id,
+    id: m.id.toString(),
     userId: m.userId,
     name: m.user.name,
     content: m.content,

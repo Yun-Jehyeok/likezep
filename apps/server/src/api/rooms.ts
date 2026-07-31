@@ -34,8 +34,13 @@ router.get("/", requireAuth, async (req, res) => {
 });
 
 router.get("/:roomId/chat", requireAuth, async (req, res) => {
-  const messages = await getRecentMessages(req.params.roomId);
-  res.json(messages);
+  try {
+    const messages = await getRecentMessages(req.params.roomId);
+    res.json(messages);
+  } catch (err) {
+    console.error("[chat] getRecentMessages error:", err);
+    res.status(500).json({ error: { message: "Failed to load chat history" } });
+  }
 });
 
 export { router as roomsRouter };
