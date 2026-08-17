@@ -13,6 +13,7 @@
   "dependencies": {
     "@mentoring/shared": "workspace:*",
     "@react-oauth/google": "^0.12.0",
+    "@sentry/react": "^10.70.0",
     "@tailwindcss/vite": "^4.3.3",
     "colyseus.js": "^0.16.0",
     "mediasoup-client": "^3.21.0",
