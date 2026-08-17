@@ -13,7 +13,11 @@ if (sentryDsn) {
     tracesSampleRate: 0,
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 0,
+    debug: true,
   });
+  // 브라우저 콘솔 테스트용: __sentryTest() 실행
+  (window as unknown as Record<string, unknown>).__sentryTest = () =>
+    Sentry.captureMessage("client Sentry test", "info");
 }
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";

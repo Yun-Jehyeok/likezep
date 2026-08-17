@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import express, { type Router as ExpressRouterType } from "express";
 import type { WebRtcTransport, Producer, RtpCapabilities, RtpParameters, DtlsParameters } from "mediasoup/node/lib/types.js";
 import { getOrCreateRouter } from "./router.js";
@@ -13,6 +14,7 @@ mediasoupRouter.get("/rtp-capabilities/:roomId", async (req, res) => {
     const msRouter = await getOrCreateRouter(req.params.roomId);
     res.json({ rtpCapabilities: msRouter.rtpCapabilities });
   } catch (e) {
+    Sentry.captureException(e);
     res.status(500).json({ error: String(e) });
   }
 });
@@ -30,6 +32,7 @@ mediasoupRouter.post("/transport/create", async (req, res) => {
       dtlsParameters: transport.dtlsParameters,
     });
   } catch (e) {
+    Sentry.captureException(e);
     res.status(500).json({ error: String(e) });
   }
 });
@@ -42,6 +45,7 @@ mediasoupRouter.post("/transport/connect", async (req, res) => {
     await transport.connect({ dtlsParameters });
     res.json({ ok: true });
   } catch (e) {
+    Sentry.captureException(e);
     res.status(500).json({ error: String(e) });
   }
 });
@@ -60,6 +64,7 @@ mediasoupRouter.post("/produce", async (req, res) => {
     producer.on("transportclose", () => producers.delete(producer.id));
     res.json({ id: producer.id });
   } catch (e) {
+    Sentry.captureException(e);
     res.status(500).json({ error: String(e) });
   }
 });
@@ -92,6 +97,7 @@ mediasoupRouter.post("/consume", async (req, res) => {
       rtpParameters: consumer.rtpParameters,
     });
   } catch (e) {
+    Sentry.captureException(e);
     res.status(500).json({ error: String(e) });
   }
 });
