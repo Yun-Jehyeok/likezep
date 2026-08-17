@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import http from "http";
 import express from "express";
 import { Server } from "@colyseus/core";
@@ -9,7 +10,16 @@ import { getWorker } from "./mediasoup/worker.js";
 import { authRouter } from "./api/auth.js";
 import { roomsRouter } from "./api/rooms.js";
 import { adminRouter } from "./api/admin.js";
+import { internalRouter } from "./api/internal.js";
 import { config } from "./config.js";
+
+Sentry.init({
+  dsn: config.SENTRY_DSN,
+  enabled: !!config.SENTRY_DSN,
+  environment: config.NODE_ENV,
+  release: config.SENTRY_RELEASE,
+  tracesSampleRate: 0,
+});
 
 const app = express();
 app.use(express.json());
@@ -25,6 +35,7 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRouter);
 app.use("/api/rooms", roomsRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/internal", internalRouter);
 app.use("/ms", mediasoupRouter);
 
 app.get("/turn-credentials", (_req, res) => {
@@ -42,6 +53,8 @@ app.get("/turn-credentials", (_req, res) => {
     ],
   });
 });
+
+Sentry.setupExpressErrorHandler(app);
 
 const httpServer = http.createServer(app);
 

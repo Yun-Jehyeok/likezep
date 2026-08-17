@@ -12,6 +12,9 @@ const schema = z.object({
   TURN_PORT: z.coerce.number().default(3478),
   TURN_TTL: z.coerce.number().default(86400),
   MEDIASOUP_ANNOUNCED_IP: z.string().optional(),
+  NODE_ENV: z.string().default("production"),
+  SENTRY_DSN: z.string().optional(),
+  SENTRY_RELEASE: z.string().optional(),
 });
 
 export const config = schema.parse(process.env);

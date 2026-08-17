@@ -1,11 +1,74 @@
-import { setPeer, getPeer } from "./cleanup.js";
+import { setPeer, getPeer, registerStatsInterval } from "./cleanup.js";
 
-// Buffer candidates that arrive before setRemoteDescription
 const iceCandidateQueue = new Map<string, RTCIceCandidateInit[]>();
 
+const API_URL =
+  ((import.meta as any).env?.VITE_API_URL as string | undefined) ?? "http://localhost:2567";
 
 type SendSignal = (type: string, payload: object) => void;
 type OnRemoteStream = (peerId: string, stream: MediaStream) => void;
+
+function startStatsCollection(peerId: string, pc: RTCPeerConnection): void {
+  const interval = setInterval(async () => {
+    try {
+      const stats = await pc.getStats();
+      let packetsLost = 0, packetsSent = 0, jitter = 0, roundTripTime = 0, availableBitrate = 0;
+      let iceType: "host" | "srflx" | "relay" = "host";
+
+      stats.forEach((report) => {
+        if (report.type === "outbound-rtp" && (report as any).kind === "audio") {
+          packetsLost = (report as any).packetsLost ?? 0;
+          packetsSent = (report as any).packetsSent ?? 0;
+          jitter = (report as any).jitter ?? 0;
+        }
+        if (report.type === "remote-inbound-rtp") {
+          roundTripTime = ((report as any).roundTripTime ?? 0) * 1000;
+        }
+        if (report.type === "candidate-pair" && (report as any).state === "succeeded") {
+          availableBitrate = (report as any).availableOutgoingBitrate ?? 0;
+        }
+        if (report.type === "remote-candidate") {
+          const ct = (report as any).candidateType;
+          if (ct === "relay") iceType = "relay";
+          else if (ct === "srflx") iceType = "srflx";
+        }
+      });
+
+      const lossRate = packetsSent > 0 ? packetsLost / packetsSent : 0;
+
+      if (lossRate > 0.05) {
+        import("@sentry/react").then(({ captureMessage }) => {
+          captureMessage(`WebRTC high packet loss: ${(lossRate * 100).toFixed(1)}% (peer: ${peerId})`, "warning");
+        }).catch(() => {});
+      }
+      if (roundTripTime > 300) {
+        import("@sentry/react").then(({ captureMessage }) => {
+          captureMessage(`WebRTC high RTT: ${roundTripTime.toFixed(0)}ms (peer: ${peerId})`, "warning");
+        }).catch(() => {});
+      }
+
+      fetch(`${API_URL}/api/internal/webrtc-stats`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          peerId,
+          packetsLost,
+          packetsSent,
+          lossRate,
+          jitter: jitter * 1000,
+          roundTripTime,
+          availableBitrate,
+          iceType,
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    } catch (e) {
+      console.warn("[webrtc-stats] getStats failed:", e);
+    }
+  }, 10_000);
+
+  registerStatsInterval(peerId, interval);
+}
 
 function createPc(
   peerId: string,
@@ -31,18 +94,12 @@ function createPc(
   pc.oniceconnectionstatechange = () => {
     console.log(`[ICE ${peerId}] state: ${pc.iceConnectionState}`);
     if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+      startStatsCollection(peerId, pc);
       pc.getStats().then((stats) => {
         stats.forEach((report) => {
-          if (report.type === "candidate-pair") {
-            const pair = report as RTCIceCandidatePairStats;
-            if (pair.state === "succeeded") {
-              console.log(`[ICE ${peerId}] selected pair:`, pair);
-            }
-          }
           if (report.type === "remote-candidate") {
             const candidateType = (report as { candidateType?: string }).candidateType;
             console.log(`[ICE ${peerId}] remote candidate type: ${candidateType}`);
-            // host | srflx | relay — relay이면 TURN 경유
           }
         });
       }).catch(console.warn);

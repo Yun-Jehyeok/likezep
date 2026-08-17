@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import { Room, Client } from "@colyseus/core";
 import jwt from "jsonwebtoken";
 import { Player, ProximityRoomState } from "./schema/RoomState.js";
@@ -22,6 +23,7 @@ export class ProximityRoom extends Room<ProximityRoomState> {
   private currentShares = new Map<string, { producerId: string; presenterName: string }>();
   private dbRoomId = "";
   private userNames = new Map<string, string>(); // sessionId → display name
+  private lastTickTime: number | null = null;
 
   onCreate(options: { dbRoomId?: string }) {
     this.dbRoomId = options.dbRoomId ?? "";
@@ -166,7 +168,34 @@ export class ProximityRoom extends Room<ProximityRoomState> {
     this.state.players.delete(id);
   }
 
+  onError(code: number, message?: string) {
+    Sentry.captureException(new Error(`ProximityRoom error ${code}: ${message ?? ""}`), {
+      extra: { roomId: this.dbRoomId, players: this.state.players.size },
+    });
+  }
+
   private tick() {
+    const now = Date.now();
+    if (this.lastTickTime !== null) {
+      const actual = now - this.lastTickTime;
+      if (actual > 150) {
+        console.warn(JSON.stringify({
+          type: "tick-delay",
+          roomId: this.dbRoomId,
+          expected: 100,
+          actual,
+          players: this.state.players.size,
+        }));
+        if (actual > 200) {
+          Sentry.captureMessage(
+            `tick delay ${actual}ms in room ${this.dbRoomId} (${this.state.players.size} players)`,
+            "warning",
+          );
+        }
+      }
+    }
+    this.lastTickTime = now;
+
     if (this.state.players.size < 2) return;
 
     const positions = new Map<string, { x: number; y: number }>();

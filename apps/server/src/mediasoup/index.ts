@@ -84,6 +84,7 @@ mediasoupRouter.post("/consume", async (req, res) => {
     if (consumer.kind === "video") {
       consumer.requestKeyFrame().catch(() => {});
     }
+    console.log(JSON.stringify({ type: "ms-consumer-count", activeProducers: producers.size }));
     res.json({
       id: consumer.id,
       producerId,
