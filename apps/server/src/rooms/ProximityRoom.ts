@@ -19,7 +19,7 @@ const DISCONNECT_THRESHOLD = 180;
 
 export class ProximityRoom extends Room<ProximityRoomState> {
   private connectedPairs = new Set<string>();
-  private currentShare: { producerId: string; presenterId: string } | null = null;
+  private currentShares = new Map<string, { producerId: string; presenterName: string }>();
   private dbRoomId = "";
   private userNames = new Map<string, string>(); // sessionId → display name
 
@@ -80,12 +80,17 @@ export class ProximityRoom extends Room<ProximityRoomState> {
     });
 
     this.onMessage("screenshare-start", (client: Client, payload: { producerId: string }) => {
-      this.currentShare = { producerId: payload.producerId, presenterId: client.sessionId };
-      this.broadcast("screenshare-started", this.currentShare, { except: client });
+      const presenterName = this.userNames.get(client.sessionId) ?? "Unknown";
+      this.currentShares.set(client.sessionId, { producerId: payload.producerId, presenterName });
+      this.broadcast("screenshare-started", {
+        producerId: payload.producerId,
+        presenterId: client.sessionId,
+        presenterName,
+      }, { except: client });
     });
 
     this.onMessage("screenshare-stop", (client: Client) => {
-      this.currentShare = null;
+      this.currentShares.delete(client.sessionId);
       this.broadcast("screenshare-stopped", { presenterId: client.sessionId }, { except: client });
     });
   }
@@ -122,8 +127,8 @@ export class ProximityRoom extends Room<ProximityRoomState> {
     player.y = 300 + (Math.random() * 100 - 50);
     this.state.players.set(client.sessionId, player);
 
-    if (this.currentShare) {
-      client.send("screenshare-started", this.currentShare);
+    for (const [presenterId, share] of this.currentShares) {
+      client.send("screenshare-started", { ...share, presenterId });
     }
 
     if (auth?.userId && this.dbRoomId) {
@@ -138,8 +143,8 @@ export class ProximityRoom extends Room<ProximityRoomState> {
       logAccess(auth.userId, this.dbRoomId, "leave").catch(console.error);
     }
 
-    if (this.currentShare?.presenterId === client.sessionId) {
-      this.currentShare = null;
+    if (this.currentShares.has(client.sessionId)) {
+      this.currentShares.delete(client.sessionId);
       this.broadcast("screenshare-stopped", { presenterId: client.sessionId });
     }
 

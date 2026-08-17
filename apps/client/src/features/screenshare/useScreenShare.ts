@@ -8,19 +8,25 @@ const SERVER_HTTP_URL =
     ?.replace("ws://", "http://")
     ?.replace("wss://", "https://") ?? "http://localhost:2567";
 
+export interface ScreenShareEntry {
+  stream: MediaStream;
+  presenterName: string;
+  presenterId: string;
+}
+
 export function useScreenShare(room: Room | null) {
   const [isSharing, setIsSharing] = useState(false);
-  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  // presenterId → entry
+  const [screenShares, setScreenShares] = useState<Map<string, ScreenShareEntry>>(new Map());
 
   const deviceRef = useRef<Device | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sendTransportRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const producerRef = useRef<any>(null);
+  // presenterId → { consumer, recvTransport }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recvTransportRef = useRef<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const consumerRef = useRef<any>(null);
+  const consumersRef = useRef<Map<string, { consumer: any; recvTransport: any }>>(new Map());
 
   async function getDevice(roomId: string): Promise<Device> {
     if (deviceRef.current?.loaded) return deviceRef.current;
@@ -32,11 +38,10 @@ export function useScreenShare(room: Room | null) {
     return device;
   }
 
-  // 시청자: screenshare-started 수신 시 consume
   useEffect(() => {
     if (!room) return;
 
-    room.onMessage<ScreenShareBroadcastPayload>("screenshare-started", async ({ producerId }) => {
+    room.onMessage<ScreenShareBroadcastPayload>("screenshare-started", async ({ producerId, presenterId, presenterName }) => {
       try {
         const device = await getDevice(room.roomId);
 
@@ -48,7 +53,6 @@ export function useScreenShare(room: Room | null) {
         const transportParams = await transportRes.json();
 
         const recvTransport = device.createRecvTransport(transportParams);
-        recvTransportRef.current = recvTransport;
 
         recvTransport.on("connect", async ({ dtlsParameters }: any, callback: () => void, errback: (e: Error) => void) => {
           try {
@@ -80,28 +84,36 @@ export function useScreenShare(room: Room | null) {
         }
 
         const consumer = await recvTransport.consume(consumeParams);
-        consumerRef.current = consumer;
         await consumer.resume();
 
+        consumersRef.current.set(presenterId, { consumer, recvTransport });
+
         const stream = new MediaStream([consumer.track]);
-        setScreenStream(stream);
-        console.log("[screenshare] consuming producerId:", producerId);
+        setScreenShares((prev) => {
+          const next = new Map(prev);
+          next.set(presenterId, { stream, presenterName, presenterId });
+          return next;
+        });
       } catch (e) {
         console.error("[screenshare] consume failed:", e);
       }
     });
 
-    room.onMessage<ScreenShareStoppedPayload>("screenshare-stopped", () => {
-      consumerRef.current?.close();
-      recvTransportRef.current?.close();
-      consumerRef.current = null;
-      recvTransportRef.current = null;
-      setScreenStream(null);
-      console.log("[screenshare] presenter stopped sharing");
+    room.onMessage<ScreenShareStoppedPayload>("screenshare-stopped", ({ presenterId }) => {
+      const entry = consumersRef.current.get(presenterId);
+      if (entry) {
+        entry.consumer.close();
+        entry.recvTransport.close();
+        consumersRef.current.delete(presenterId);
+      }
+      setScreenShares((prev) => {
+        const next = new Map(prev);
+        next.delete(presenterId);
+        return next;
+      });
     });
   }, [room]);
 
-  // 발표자: 화면공유 시작
   const startShare = useCallback(async () => {
     if (!room) return;
     try {
@@ -149,19 +161,16 @@ export function useScreenShare(room: Room | null) {
 
       const producer = await sendTransport.produce({ track });
       producerRef.current = producer;
-      console.log("[screenshare] producer.id:", producer.id);
 
       room.send("screenshare-start", { producerId: producer.id });
       setIsSharing(true);
 
-      // 브라우저 UI에서 공유 중단 시 자동 처리
       track.onended = () => stopShare();
     } catch (e) {
       console.error("[screenshare] startShare failed:", e);
     }
   }, [room]);
 
-  // 발표자: 화면공유 중단
   const stopShare = useCallback(() => {
     producerRef.current?.close();
     sendTransportRef.current?.close();
@@ -169,8 +178,7 @@ export function useScreenShare(room: Room | null) {
     sendTransportRef.current = null;
     room?.send("screenshare-stop", {});
     setIsSharing(false);
-    console.log("[screenshare] stopped sharing");
   }, [room]);
 
-  return { isSharing, startShare, stopShare, screenStream };
+  return { isSharing, startShare, stopShare, screenShares };
 }

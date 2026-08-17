@@ -49,7 +49,8 @@ export function RoomPage() {
   const [remotePeers, setRemotePeers] = useState<Record<string, RemotePeer>>({});
   const [colyseusRoom, setColyseusRoom] = useState<Room | null>(null);
 
-  const { isSharing, startShare, stopShare, screenStream } = useScreenShare(colyseusRoom);
+  const { isSharing, startShare, stopShare, screenShares } = useScreenShare(colyseusRoom);
+  const [selectedShareId, setSelectedShareId] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const roomRef = useRef<Room | null>(null);
@@ -62,6 +63,13 @@ export function RoomPage() {
 
   const roomName = (location.state as { roomName?: string } | null)?.roomName ?? roomId;
   const isPresenter = user?.role === "admin" || user?.role === "mentor";
+
+  const screenShareList = Array.from(screenShares.values());
+  const activeShare = screenShareList.length === 1
+    ? screenShareList[0]
+    : selectedShareId != null
+      ? (screenShares.get(selectedShareId) ?? null)
+      : null;
 
   // Scroll chat to bottom on new message
   useEffect(() => {
@@ -361,47 +369,38 @@ export function RoomPage() {
         <div className="flex-1 relative">
           <canvas key={roomId} ref={canvasRef} className="absolute inset-0 w-full h-full" />
 
-          {/* 근접 화상 타일 */}
-          {remotePeerList.length > 0 && (
-            <div className="absolute top-4 right-4 flex flex-col gap-2 pointer-events-none">
+          {/* 오른쪽 타일: 근접 화상 + 화면 공유 썸네일 */}
+          {(remotePeerList.length > 0 || screenShareList.length > 0) && (
+            <div className="absolute top-4 right-4 flex flex-col gap-2">
               {remotePeerList.map(([peerId, peer]) => (
                 <VideoTile key={peerId} stream={peer.stream} name={peer.name} />
+              ))}
+              {screenShareList.map((entry) => (
+                <ScreenShareTile
+                  key={entry.presenterId}
+                  entry={entry}
+                  isSelected={
+                    screenShareList.length === 1
+                      ? true
+                      : selectedShareId === entry.presenterId
+                  }
+                  onClick={() =>
+                    setSelectedShareId((prev) =>
+                      prev === entry.presenterId ? null : entry.presenterId
+                    )
+                  }
+                />
               ))}
             </div>
           )}
 
           {/* 화면공유 오버레이 */}
-          {screenStream && <ScreenShareOverlay stream={screenStream} />}
-
-          {/* 화면공유 버튼 */}
-          {isPresenter && (
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
-              {isSharing ? (
-                <button
-                  type="button"
-                  onClick={stopShare}
-                  className="h-9 px-4 bg-[#e03131] hover:bg-[#c92a2a] text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <rect x="2" y="3" width="20" height="14" rx="2" stroke="white" strokeWidth="1.8"/>
-                    <path d="M8 21h8M12 17v4" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
-                  </svg>
-                  공유 중단
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={startShare}
-                  className="h-9 px-4 bg-[#0071ff] hover:bg-[#0064e6] text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <rect x="2" y="3" width="20" height="14" rx="2" stroke="white" strokeWidth="1.8"/>
-                    <path d="M8 21h8M12 17v4" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
-                  </svg>
-                  화면 공유
-                </button>
-              )}
-            </div>
+          {activeShare && (
+            <ScreenShareOverlay
+              stream={activeShare.stream}
+              presenterName={activeShare.presenterName}
+              onClose={screenShareList.length > 1 ? () => setSelectedShareId(null) : undefined}
+            />
           )}
         </div>
 
@@ -484,6 +483,14 @@ export function RoomPage() {
           inactiveColor="bg-[#fff1f0] text-[#e03131]"
           icon={<CamIcon />}
         />
+        <ControlButton
+          active={isSharing}
+          onClick={isSharing ? stopShare : startShare}
+          label={isSharing ? "공유 중단" : "화면 공유"}
+          activeColor="bg-[#e03131] text-white"
+          inactiveColor="bg-[#f4f6f9] text-[#17171b]"
+          icon={<ScreenShareIcon />}
+        />
         <div className="w-px h-6 bg-[#e4e4e4] mx-1" />
         <button
           type="button"
@@ -527,6 +534,34 @@ function VideoTile({ stream, name }: { stream: MediaStream; name: string }) {
   );
 }
 
+function ScreenShareTile({ entry, isSelected, onClick }: {
+  entry: import("../screenshare/useScreenShare.js").ScreenShareEntry;
+  isSelected: boolean;
+  onClick: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.srcObject = entry.stream;
+  }, [entry.stream]);
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-28 h-20 rounded-xl overflow-hidden border-2 transition-colors relative ${
+        isSelected ? "border-[#0071ff]" : "border-white/20 hover:border-white/40"
+      }`}
+    >
+      <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+      <div className="absolute bottom-0 inset-x-0 bg-black/50 px-1.5 py-0.5 flex items-center gap-1">
+        <div className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+        <span className="text-white text-[9px] truncate">{entry.presenterName}</span>
+      </div>
+    </button>
+  );
+}
+
 function ControlButton({ active, onClick, label, activeColor, inactiveColor, icon }: {
   active: boolean; onClick: () => void; label: string;
   activeColor: string; inactiveColor: string; icon: React.ReactNode;
@@ -562,6 +597,15 @@ function CamIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
       <path d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function ScreenShareIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.8"/>
+      <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
     </svg>
   );
 }

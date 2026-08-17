@@ -29,7 +29,7 @@ export interface ProximityConnectPayload { peerId: string; isOfferer: boolean }
 export interface ProximityDisconnectPayload { peerId: string }
 export interface ChatBroadcastPayload { id: number; userId: string; userName: string; content: string; createdAt: string }
 export interface WebRtcRelayPayload { from: string; sdp?: RtcSdp; candidate?: RtcIceCandidate }
-export interface ScreenShareBroadcastPayload { producerId: string; presenterId: string }
+export interface ScreenShareBroadcastPayload { producerId: string; presenterId: string; presenterName: string }
 export interface ScreenShareStoppedPayload { presenterId: string }
 
 export type ServerToClientMessages =
