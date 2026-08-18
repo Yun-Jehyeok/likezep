@@ -35,3 +35,22 @@ export async function updateUserLastLogin(id: string) {
 export async function updateUser(id: string, data: { role?: Role; groupId?: string | null }) {
   return prisma.user.update({ where: { id }, data });
 }
+
+export async function upsertTestUser(data: {
+  email: string;
+  name: string;
+  role: Role;
+  groupId?: string | null;
+}) {
+  return prisma.user.upsert({
+    where: { email: data.email },
+    update: { role: data.role, groupId: data.groupId ?? null, name: data.name },
+    create: {
+      googleId: `e2e_${data.email}`,
+      email: data.email,
+      name: data.name,
+      role: data.role,
+      groupId: data.groupId ?? null,
+    },
+  });
+}

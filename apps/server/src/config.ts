@@ -15,6 +15,7 @@ const schema = z.object({
   NODE_ENV: z.string().default("production"),
   SENTRY_DSN: z.string().optional(),
   SENTRY_RELEASE: z.string().optional(),
+  E2E_ENABLED: z.string().optional().transform((v) => v === "true"),
 });
 
 export const config = schema.parse(process.env);
