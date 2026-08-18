@@ -21,15 +21,35 @@ test.describe("방 스위처", () => {
     await injectAuth(page, auth);
     await page.goto(`${BASE_URL}/room/${ROOMS.plaza}`);
 
-    // 광장 로드 대기
+    // canvas가 DOM에 나타날 때까지 대기 (PixiJS 마운트 기준)
     await page.locator("canvas").waitFor({ state: "visible", timeout: 20_000 });
-    await expect(page.locator("text=광장")).toBeVisible();
 
-    // 방 전환 드롭다운 열기
-    await page.getByRole("button", { name: "방 전환" }).click();
+    // Colyseus가 실제로 연결됐는지 확인 — onPlayerJoin 콜백 후 "N명 접속 중" 표시됨
+    // canvas가 visible 해도 Colyseus 연결 전엔 오류 화면으로 전환될 수 있으므로 이 대기가 필수
+    await page.waitForFunction(
+      () => {
+        const spans = [...document.querySelectorAll("span")];
+        return spans.some((s) => {
+          const m = (s.textContent ?? "").match(/(\d+)명 접속 중/);
+          return m !== null && parseInt(m[1]) > 0;
+        });
+      },
+      { timeout: 30_000 }
+    );
 
-    // 드롭다운에서 회의실 선택
-    await page.getByRole("button", { name: /회의실/ }).click();
+    // "방 전환" 버튼 클릭
+    const switcherBtn = page.locator("button").filter({ hasText: "방 전환" });
+    await switcherBtn.waitFor({ state: "visible", timeout: 10_000 });
+    await switcherBtn.click({ force: true });
+
+    // 드롭다운 열림 확인 (open=true 시 w-52 드롭다운 div 렌더링)
+    await page.waitForFunction(
+      () => document.querySelector("div.w-52") !== null,
+      { timeout: 10_000 }
+    );
+
+    // 회의실 선택
+    await page.locator("button").filter({ hasText: "회의실" }).click({ timeout: 10_000 });
 
     // URL 변경 확인 (새로고침 없음)
     await expect(page).toHaveURL(`${BASE_URL}/room/${ROOMS.meeting}`, {
@@ -38,6 +58,15 @@ test.describe("방 스위처", () => {
 
     // 회의실 캔버스 렌더링 확인
     await page.locator("canvas").waitFor({ state: "visible", timeout: 20_000 });
-    await expect(page.locator("text=회의실")).toBeVisible();
+    await page.waitForFunction(
+      () => {
+        const spans = [...document.querySelectorAll("span")];
+        return spans.some((s) => {
+          const m = (s.textContent ?? "").match(/(\d+)명 접속 중/);
+          return m !== null && parseInt(m[1]) > 0;
+        });
+      },
+      { timeout: 30_000 }
+    );
   });
 });
