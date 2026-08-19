@@ -18,7 +18,7 @@ _*.log
 # 문서 (README.md만 예외)
 docs/
 *.md
-!README.md
+!/README.md
 
 # Prisma
 prisma/migrations/*.sql.bak
@@ -26,6 +26,11 @@ prisma/migrations/*.sql.bak
 # Playwright
 playwright-report/
 test-results/
+e2e-report/
+e2e-debug-*.png
+
+# infra 시크릿 (예시 파일만 커밋, 실제 conf는 서버에서만 관리)
+infra/coturn/turnserver.conf
 
 # IDE
 .vscode/
