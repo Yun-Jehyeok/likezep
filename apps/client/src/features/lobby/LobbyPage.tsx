@@ -66,7 +66,7 @@ export function LobbyPage() {
             <button
               type="button"
               onClick={() => navigate("/admin")}
-              className="text-sm text-[#0071ff] font-medium hover:text-[#0064e6] transition-colors"
+              className="text-sm text-[#0071ff] font-medium hover:text-[#0064e6] transition-colors cursor-pointer"
             >
               관리 대시보드
             </button>
@@ -81,7 +81,7 @@ export function LobbyPage() {
           <button
             type="button"
             onClick={handleLogout}
-            className="text-sm text-[#767676] hover:text-[#17171b] transition-colors"
+            className="text-sm text-[#767676] hover:text-[#17171b] transition-colors cursor-pointer"
           >
             로그아웃
           </button>
@@ -130,7 +130,7 @@ function RoomCardItem({ room, onClick }: { room: RoomCard; onClick: () => void }
     <button
       type="button"
       onClick={onClick}
-      className="bg-white rounded-2xl border border-[#e4e4e4] hover:border-[#0071ff] hover:shadow-[0_4px_20px_rgba(0,113,255,0.12)] p-5 text-left transition-all group"
+      className="bg-white rounded-2xl border border-[#e4e4e4] hover:border-[#0071ff] hover:shadow-[0_4px_20px_rgba(0,113,255,0.12)] p-5 text-left transition-all group cursor-pointer"
     >
       <div className="flex items-start justify-between mb-4">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#f4f6f9] group-hover:bg-[#e8f1ff] transition-colors">

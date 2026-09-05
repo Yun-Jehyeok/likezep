@@ -25,7 +25,8 @@ export function ScreenShareOverlay({ stream, presenterName, onClose }: Props) {
             <button
               type="button"
               onClick={onClose}
-              className="text-white/60 hover:text-white transition-colors"
+              title="선택 해제"
+              className="text-white/60 hover:text-white transition-colors cursor-pointer"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>

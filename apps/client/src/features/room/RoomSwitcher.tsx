@@ -30,7 +30,7 @@ export function RoomSwitcher({ currentRoomId }: Props) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="h-8 px-3 text-sm font-medium text-[#767676] border border-[#e4e4e4] rounded-lg hover:border-[#0071ff] hover:text-[#0071ff] transition-colors"
+        className="h-8 px-3 text-sm font-medium text-[#767676] border border-[#e4e4e4] rounded-lg hover:border-[#0071ff] hover:text-[#0071ff] transition-colors cursor-pointer"
       >
         방 전환
       </button>
@@ -42,7 +42,7 @@ export function RoomSwitcher({ currentRoomId }: Props) {
 
           <div className="absolute top-full right-0 mt-1 w-52 bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.12)] border border-[#e4e4e4] py-1 z-50">
             {others.length === 0 ? (
-              <p className="px-4 py-2.5 text-sm text-[#b2b2b2]">다른 룸이 없습니다</p>
+              <p className="px-4 py-2.5 text-sm text-[#b2b2b2]">이동 가능한 다른 방이 없어요</p>
             ) : (
               others.map((room) => (
                 <button
@@ -52,7 +52,7 @@ export function RoomSwitcher({ currentRoomId }: Props) {
                     setOpen(false);
                     navigate(`/room/${room.id}`, { state: { roomName: room.name } });
                   }}
-                  className="w-full px-4 py-2.5 text-sm text-left text-[#17171b] hover:bg-[#f4f6f9] flex items-center gap-2 transition-colors"
+                  className="w-full px-4 py-2.5 text-sm text-left text-[#17171b] hover:bg-[#f4f6f9] flex items-center gap-2 transition-colors cursor-pointer"
                 >
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${room.occupants > 0 ? "bg-[#22c55e]" : "bg-[#b2b2b2]"}`} />
                   <span className="flex-1 truncate">{room.name}</span>

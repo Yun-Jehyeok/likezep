@@ -168,7 +168,7 @@ export function AdminPage() {
         <button
           type="button"
           onClick={() => navigate("/lobby")}
-          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#f4f6f9] text-[#767676] hover:text-[#17171b] transition-colors"
+          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#f4f6f9] text-[#767676] hover:text-[#17171b] transition-colors cursor-pointer"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
             <path d="M15 19l-7-7 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -185,7 +185,7 @@ export function AdminPage() {
             key={t}
             type="button"
             onClick={() => setTab(t)}
-            className={`px-4 py-3.5 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-4 py-3.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
               tab === t
                 ? "border-[#0071ff] text-[#0071ff]"
                 : "border-transparent text-[#767676] hover:text-[#17171b]"
@@ -202,7 +202,7 @@ export function AdminPage() {
         {/* 실시간 현황 */}
         {tab === "status" && (
           loading && statusList.length === 0 ? (
-            <p className="text-sm text-[#b2b2b2]">불러오는 중...</p>
+            <p className="text-sm text-[#b2b2b2]">접속 현황을 불러오는 중...</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {statusList.map((room) => (
@@ -255,7 +255,7 @@ export function AdminPage() {
                   type="button"
                   disabled={!groupInput.trim() || creating}
                   onClick={handleCreateGroup}
-                  className="h-10 px-4 rounded-xl bg-[#0071ff] hover:bg-[#0064e6] disabled:bg-[#b2b2b2] text-white text-sm font-medium transition-colors"
+                  className="h-10 px-4 rounded-xl bg-[#0071ff] hover:bg-[#0064e6] disabled:bg-[#b2b2b2] text-white text-sm font-medium transition-colors cursor-pointer disabled:cursor-not-allowed"
                 >
                   {creating ? "생성 중..." : "생성"}
                 </button>
@@ -268,7 +268,7 @@ export function AdminPage() {
                 <h3 className="text-sm font-semibold text-[#17171b]">그룹 목록</h3>
               </div>
               {groups.length === 0 ? (
-                <p className="px-5 py-4 text-sm text-[#b2b2b2]">생성된 그룹 없음</p>
+                <p className="px-5 py-4 text-sm text-[#b2b2b2]">아직 생성된 그룹이 없어요</p>
               ) : (
                 <ul className="divide-y divide-[#f4f6f9]">
                   {groups.map((g) => (
@@ -285,8 +285,8 @@ export function AdminPage() {
                             }}
                             className="flex-1 h-8 px-2 rounded-lg border border-[#0071ff] text-sm text-[#17171b] outline-none"
                           />
-                          <button type="button" onClick={() => handleRenameGroup(g.id)} className="text-xs text-[#0071ff] font-medium">저장</button>
-                          <button type="button" onClick={() => setEditingGroupId(null)} className="text-xs text-[#767676]">취소</button>
+                          <button type="button" onClick={() => handleRenameGroup(g.id)} className="text-xs text-[#0071ff] font-medium cursor-pointer">저장</button>
+                          <button type="button" onClick={() => setEditingGroupId(null)} className="text-xs text-[#767676] cursor-pointer">취소</button>
                         </>
                       ) : (
                         <>
@@ -294,14 +294,14 @@ export function AdminPage() {
                           <button
                             type="button"
                             onClick={() => { setEditingGroupId(g.id); setEditingGroupName(g.name); }}
-                            className="text-xs text-[#767676] hover:text-[#17171b] transition-colors"
+                            className="text-xs text-[#767676] hover:text-[#17171b] transition-colors cursor-pointer"
                           >
                             수정
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDeleteGroup(g.id, g.name)}
-                            className="text-xs text-[#e05c00] hover:text-red-600 transition-colors"
+                            className="text-xs text-[#e05c00] hover:text-red-600 transition-colors cursor-pointer"
                           >
                             삭제
                           </button>
@@ -319,7 +319,7 @@ export function AdminPage() {
                 <h3 className="text-sm font-semibold text-[#17171b]">전체 유저</h3>
               </div>
               {loading && users.length === 0 ? (
-                <p className="px-5 py-4 text-sm text-[#b2b2b2]">불러오는 중...</p>
+                <p className="px-5 py-4 text-sm text-[#b2b2b2]">유저 목록을 불러오는 중...</p>
               ) : (
                 <table className="w-full">
                   <thead>
@@ -340,7 +340,7 @@ export function AdminPage() {
                           <select
                             value={u.role}
                             onChange={(e) => handleUserChange(u.id, "role", e.target.value)}
-                            className={`text-[11px] font-medium px-2 py-0.5 rounded-full border-0 cursor-pointer outline-none ${ROLE_STYLE[u.role]}`}
+                            className={`text-[11px] font-medium px-2 py-0.5 rounded-full border-0 cursor-pointer outline-none appearance-none ${ROLE_STYLE[u.role]}`}
                           >
                             <option value="admin">{ROLE_LABEL.admin}</option>
                             <option value="mentor">{ROLE_LABEL.mentor}</option>
@@ -376,7 +376,7 @@ export function AdminPage() {
               <h3 className="text-sm font-semibold text-[#17171b]">접속 로그</h3>
             </div>
             {loading && logs.length === 0 ? (
-              <p className="px-5 py-4 text-sm text-[#b2b2b2]">불러오는 중...</p>
+              <p className="px-5 py-4 text-sm text-[#b2b2b2]">로그를 불러오는 중...</p>
             ) : (
               <table className="w-full">
                 <thead>

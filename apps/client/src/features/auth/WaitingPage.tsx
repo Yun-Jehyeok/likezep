@@ -59,7 +59,7 @@ export function WaitingPage() {
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full h-11 rounded-xl text-[#767676] text-sm font-medium hover:bg-[#f4f6f9] transition-colors"
+            className="w-full h-11 rounded-xl text-[#767676] text-sm font-medium hover:bg-[#f4f6f9] transition-colors cursor-pointer"
           >
             로그아웃
           </button>
