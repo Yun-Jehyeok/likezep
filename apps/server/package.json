@@ -13,8 +13,10 @@
   },
   "dependencies": {
     "@colyseus/core": "^0.16.0",
+    "@colyseus/monitor": "^0.16.0",
     "@colyseus/schema": "^3.0.0",
     "@colyseus/ws-transport": "^0.16.0",
+    "express-basic-auth": "^1.2.1",
     "@mentoring/shared": "workspace:*",
     "@prisma/client": "^6.0.0",
     "@sentry/node": "^10.70.0",

@@ -3,6 +3,8 @@ import http from "http";
 import express from "express";
 import { Server } from "@colyseus/core";
 import { WebSocketTransport } from "@colyseus/ws-transport";
+import { monitor } from "@colyseus/monitor";
+import basicAuth from "express-basic-auth";
 import { ProximityRoom } from "./rooms/ProximityRoom.js";
 import { generateTurnCredentials } from "./turn/credentials.js";
 import { mediasoupRouter } from "./mediasoup/index.js";
@@ -53,6 +55,12 @@ app.get("/turn-credentials", (_req, res) => {
     ],
   });
 });
+
+app.use(
+  "/colyseus",
+  basicAuth({ users: { admin: config.MONITOR_PASSWORD }, challenge: true }),
+  monitor()
+);
 
 Sentry.setupExpressErrorHandler(app);
 

@@ -16,6 +16,7 @@ const schema = z.object({
   SENTRY_DSN: z.string().optional(),
   SENTRY_RELEASE: z.string().optional(),
   E2E_ENABLED: z.string().optional().transform((v) => v === "true"),
+  MONITOR_PASSWORD: z.string().default("changeme"),
 });
 
 export const config = schema.parse(process.env);
