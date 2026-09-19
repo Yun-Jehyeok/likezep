@@ -68,6 +68,9 @@ export function RoomPage() {
   const [chatOpen, setChatOpen] = useState(true);
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(false);
+  const [audioOutputId, setAudioOutputId] = useState("");
+  const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [showSpeakerMenu, setShowSpeakerMenu] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [occupants, setOccupants] = useState(0);
   const [connError, setConnError] = useState<string | null>(null);
@@ -102,6 +105,18 @@ export function RoomPage() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // 오디오 출력 장치 목록 — 마운트 시 초기 로드, 기기 연결/해제 시 갱신
+  useEffect(() => {
+    const enumerate = () => {
+      navigator.mediaDevices?.enumerateDevices()
+        .then((all) => setAudioOutputDevices(all.filter((d) => d.kind === "audiooutput")))
+        .catch(() => {});
+    };
+    enumerate();
+    navigator.mediaDevices?.addEventListener("devicechange", enumerate);
+    return () => navigator.mediaDevices?.removeEventListener("devicechange", enumerate);
+  }, []);
+
   useEffect(() => {
     if (!roomId || !token || !user || !canvasRef.current) return;
 
@@ -120,6 +135,10 @@ export function RoomPage() {
         const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
         s.getAudioTracks().forEach((t) => { t.enabled = false; });
         localStreamRef.current = s;
+        // 권한 획득 후 재열거 — 이제 레이블이 붙어서 돌아온다
+        navigator.mediaDevices.enumerateDevices()
+          .then((all) => setAudioOutputDevices(all.filter((d) => d.kind === "audiooutput")))
+          .catch(() => {});
         return s;
       } catch {
         const s = new MediaStream();
@@ -266,6 +285,9 @@ export function RoomPage() {
         if (!localStreamRef.current) {
           const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
           localStreamRef.current = s;
+          navigator.mediaDevices.enumerateDevices()
+            .then((all) => setAudioOutputDevices(all.filter((d) => d.kind === "audiooutput")))
+            .catch(() => {});
         }
         localStreamRef.current.getAudioTracks().forEach((t) => { t.enabled = true; });
         setMicOn(true);
@@ -321,6 +343,7 @@ export function RoomPage() {
   }
 
   const remotePeerList = Object.entries(remotePeers);
+  const supportsSinkId = typeof HTMLVideoElement !== "undefined" && "setSinkId" in HTMLVideoElement.prototype;
 
   if (connError) {
     const isAccessDenied = connError.toLowerCase().includes("access denied") || connError.includes("Access denied");
@@ -402,7 +425,7 @@ export function RoomPage() {
           {(remotePeerList.length > 0 || screenShareList.length > 0) && (
             <div className="absolute top-4 right-4 flex flex-col gap-2">
               {remotePeerList.map(([peerId, peer]) => (
-                <VideoTile key={peerId} stream={peer.stream} name={peer.name} />
+                <VideoTile key={peerId} stream={peer.stream} name={peer.name} sinkId={audioOutputId} />
               ))}
               {screenShareList.map((entry) => (
                 <ScreenShareTile
@@ -513,6 +536,48 @@ export function RoomPage() {
           inactiveColor="bg-[#fff1f0] text-[#e03131]"
           icon={<CamIcon />}
         />
+        {supportsSinkId && audioOutputDevices.length > 0 && (
+          <div className="relative">
+            <ControlButton
+              active={showSpeakerMenu}
+              onClick={() => setShowSpeakerMenu((v) => !v)}
+              label="출력 장치 선택"
+              activeColor="bg-[#e8f1ff] text-[#0071ff]"
+              inactiveColor="bg-[#f4f6f9] text-[#17171b]"
+              icon={<SpeakerIcon />}
+            />
+            {showSpeakerMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowSpeakerMenu(false)} />
+                <div className="absolute bottom-12 left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-xl border border-[#e4e4e4] py-1.5 z-50 w-56">
+                  <p className="text-[11px] text-[#767676] px-4 py-1.5 font-medium">출력 장치</p>
+                  {audioOutputDevices.map((d) => {
+                    const isSelected = audioOutputId ? audioOutputId === d.deviceId : d.deviceId === "default";
+                    return (
+                      <button
+                        key={d.deviceId}
+                        type="button"
+                        onClick={() => { setAudioOutputId(d.deviceId); setShowSpeakerMenu(false); }}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-[#f4f6f9] transition-colors flex items-center gap-2 cursor-pointer ${isSelected ? "text-[#0071ff] font-medium" : "text-[#17171b]"}`}
+                      >
+                        <span className="w-3 shrink-0 flex items-center justify-center">
+                          {isSelected && (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                              <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                        </span>
+                        <span className="truncate">
+                          {d.label || (d.deviceId === "default" ? "기본 스피커" : "스피커")}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        )}
         <ControlButton
           active={isSharing}
           onClick={isSharing ? stopShare : startShare}
@@ -537,13 +602,19 @@ export function RoomPage() {
   );
 }
 
-function VideoTile({ stream, name }: { stream: MediaStream; name: string }) {
+function VideoTile({ stream, name, sinkId }: { stream: MediaStream; name: string; sinkId: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hasVideo = stream.getVideoTracks().some((t) => t.enabled);
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.srcObject = stream;
   }, [stream]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !sinkId) return;
+    (el as HTMLVideoElement & { setSinkId?: (id: string) => Promise<void> }).setSinkId?.(sinkId).catch(() => {});
+  }, [sinkId]);
 
   return (
     <div className="w-28 h-20 rounded-xl bg-white/10 border border-white/10 overflow-hidden backdrop-blur-sm">
@@ -627,6 +698,15 @@ function CamIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
       <path d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function SpeakerIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path d="M11 5L6 9H2v6h4l5 4V5z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }
