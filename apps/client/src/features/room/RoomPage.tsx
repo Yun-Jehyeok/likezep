@@ -1,3 +1,29 @@
+/**
+ * RoomPage — 멘토링 룸의 최상위 컴포넌트 (오케스트레이터)
+ *
+ * 이 컴포넌트는 여러 독립 시스템을 조율한다:
+ * ┌─────────────────────────────────────────────────────────┐
+ * │ Colyseus (실시간 상태 동기화 + 메시지 라우팅)            │
+ * │   ↓                                                     │
+ * │ GameApp (PixiJS 렌더링 + 게임 루프)                     │
+ * │   ↓                                                     │
+ * │ peerManager (WebRTC P2P 연결 — 근접 화상)               │
+ * │   ↓                                                     │
+ * │ useScreenShare (mediasoup SFU — 화면공유)               │
+ * └─────────────────────────────────────────────────────────┘
+ *
+ * useEffect 생명주기:
+ * - 마운트(roomId 변경) → joinRoom() → GameApp.create() → 이벤트 핸들러 연결
+ * - 언마운트(방 이탈/탭 닫기) → cleanup 함수 → WebRTC 정리, 스트림 해제, 룸 퇴장
+ *
+ * cancelled 플래그 패턴:
+ * - 비동기 초기화 중 컴포넌트가 언마운트되면 cancelled=true가 되어
+ *   이후 setState 호출을 막는다 (unmounted 컴포넌트에 setState하면 경고)
+ *
+ * pendingPlayers 패턴:
+ * - joinRoom() 완료 전에 onPlayerJoin 이벤트가 먼저 오면 GameApp이 아직 없다
+ * - pendingPlayers에 쌓아뒀다가 GameApp이 만들어진 후 일괄 처리한다
+ */
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import type { Room } from "colyseus.js";
@@ -92,6 +118,7 @@ export function RoomPage() {
       if (localStreamRef.current) return localStreamRef.current;
       try {
         const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        s.getAudioTracks().forEach((t) => { t.enabled = false; });
         localStreamRef.current = s;
         return s;
       } catch {
