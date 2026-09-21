@@ -43,6 +43,9 @@ import { cleanupPeer, cleanupAllPeers, getPeer, activePeerIds } from "../../core
 import { useScreenShare } from "../screenshare/useScreenShare.js";
 import { ScreenShareOverlay } from "./ScreenShareOverlay.js";
 import { RoomSwitcher } from "./RoomSwitcher.js";
+import { playChatNotification } from "./chatNotificationSound.js";
+
+const NOTIF_SOUND_STORAGE_KEY = "chat-notif-sound";
 
 interface ChatMessage {
   id?: string;
@@ -68,6 +71,18 @@ export function RoomPage() {
   const [chatOpen, setChatOpen] = useState(true);
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(false);
+  const [notifSoundOn, setNotifSoundOn] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(NOTIF_SOUND_STORAGE_KEY) !== "off";
+    } catch {
+      return true;
+    }
+  });
+  const notifSoundOnRef = useRef(notifSoundOn);
+  useEffect(() => {
+    notifSoundOnRef.current = notifSoundOn;
+    try { localStorage.setItem(NOTIF_SOUND_STORAGE_KEY, notifSoundOn ? "on" : "off"); } catch { /* localStorage 접근 실패는 무시 */ }
+  }, [notifSoundOn]);
   const [audioOutputId, setAudioOutputId] = useState("");
   const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
   const [showSpeakerMenu, setShowSpeakerMenu] = useState(false);
@@ -224,7 +239,11 @@ export function RoomPage() {
 
         // Listen to chat messages
         room.onMessage<ChatMessage>("chat", (msg) => {
-          if (!cancelled) setMessages((prev) => [...prev, msg]);
+          if (cancelled) return;
+          setMessages((prev) => [...prev, msg]);
+          if (notifSoundOnRef.current && msg.userId !== user?.id) {
+            playChatNotification();
+          }
         });
 
         // Load chat history
@@ -582,6 +601,14 @@ export function RoomPage() {
           </div>
         )}
         <ControlButton
+          active={notifSoundOn}
+          onClick={() => setNotifSoundOn((v) => !v)}
+          label={notifSoundOn ? "채팅 알림음 끄기" : "채팅 알림음 켜기"}
+          activeColor="bg-[#f4f6f9] text-[#17171b]"
+          inactiveColor="bg-[#fff1f0] text-[#e03131]"
+          icon={notifSoundOn ? <BellOnIcon /> : <BellOffIcon />}
+        />
+        <ControlButton
           active={isSharing}
           onClick={isSharing ? stopShare : startShare}
           label={isSharing ? "공유 중단" : "화면 공유"}
@@ -719,6 +746,22 @@ function ScreenShareIcon() {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
       <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.8"/>
       <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function BellOnIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function BellOffIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path d="M1 1l22 22M13.73 21a2 2 0 01-3.46 0M18.63 13A17.9 17.9 0 0118 8M6.26 6.26A5.86 5.86 0 006 8c0 7-3 9-3 9h14M18 8a6 6 0 00-9.33-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }
