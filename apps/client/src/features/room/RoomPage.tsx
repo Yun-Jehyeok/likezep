@@ -78,7 +78,7 @@ export function RoomPage() {
   const [remotePeers, setRemotePeers] = useState<Record<string, RemotePeer>>({});
   const [colyseusRoom, setColyseusRoom] = useState<Room | null>(null);
 
-  const { isSharing, startShare, stopShare, screenShares } = useScreenShare(colyseusRoom);
+  const { isSharing, startShare, stopShare, screenShares } = useScreenShare(colyseusRoom, user?.name ?? "");
   const [selectedShareId, setSelectedShareId] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);

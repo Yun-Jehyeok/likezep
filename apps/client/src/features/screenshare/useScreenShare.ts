@@ -54,7 +54,7 @@ export interface ScreenShareEntry {
   presenterId: string;
 }
 
-export function useScreenShare(room: Room | null) {
+export function useScreenShare(room: Room | null, myName: string) {
   const [isSharing, setIsSharing] = useState(false);
   /** presenterId → ScreenShareEntry. 동시에 여러 사람이 공유할 수 있어 Map을 사용. */
   const [screenShares, setScreenShares] = useState<Map<string, ScreenShareEntry>>(new Map());
@@ -63,6 +63,8 @@ export function useScreenShare(room: Room | null) {
   const deviceRef = useRef<Device | null>(null);
   const sendTransportRef = useRef<any>(null);  // 발표자: 송신 transport
   const producerRef = useRef<any>(null);       // 발표자: 화면 producer
+  /** 발표자 로컬 미리보기용 원본 스트림 — 자기 화면은 SFU 왕복 없이 이 스트림을 그대로 재생 */
+  const localStreamRef = useRef<MediaStream | null>(null);
   /** presenterId → { consumer, recvTransport } — 각 발표자별로 별도 consumer를 유지 */
   const consumersRef = useRef<Map<string, { consumer: any; recvTransport: any }>>(new Map());
 
@@ -181,6 +183,7 @@ export function useScreenShare(room: Room | null) {
     try {
       const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
       const track = displayStream.getVideoTracks()[0];
+      localStreamRef.current = displayStream;
 
       const device = await getDevice(room.roomId);
 
@@ -230,19 +233,42 @@ export function useScreenShare(room: Room | null) {
       room.send("screenshare-start", { producerId: producer.id });
       setIsSharing(true);
 
+      // 발표자 본인도 리스트에서 볼 수 있도록 로컬 스트림을 추가 (SFU 왕복 없이 원본 재생)
+      setScreenShares((prev) => {
+        const next = new Map(prev);
+        next.set(room.sessionId, {
+          stream: displayStream,
+          presenterName: myName,
+          presenterId: room.sessionId,
+        });
+        return next;
+      });
+
       // 사용자가 브라우저 내장 UI로 공유를 중단할 때도 정리
       track.onended = () => stopShare();
     } catch (e) {
       console.error("[screenshare] startShare failed:", e);
     }
-  }, [room]);
+  }, [room, myName]);
 
-  /** 화면공유 종료: producer와 transport를 닫고 서버에 알린다 */
+  /** 화면공유 종료: producer/transport를 닫고, 로컬 스트림 track을 stop하고, 서버에 알린다 */
   const stopShare = useCallback(() => {
     producerRef.current?.close();
     sendTransportRef.current?.close();
     producerRef.current = null;
     sendTransportRef.current = null;
+    // 로컬 track을 stop해야 브라우저 상단 "공유 중" 인디케이터가 사라진다
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    localStreamRef.current = null;
+    // 자기 자신을 리스트에서 제거
+    if (room) {
+      setScreenShares((prev) => {
+        if (!prev.has(room.sessionId)) return prev;
+        const next = new Map(prev);
+        next.delete(room.sessionId);
+        return next;
+      });
+    }
     room?.send("screenshare-stop", {});
     setIsSharing(false);
   }, [room]);

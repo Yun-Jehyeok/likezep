@@ -25,7 +25,7 @@ export function GameScreen({ playerName }: Props) {
   const [room, setRoom] = useState<Room | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
 
-  const { isSharing, startShare, stopShare, screenShares } = useScreenShare(room);
+  const { isSharing, startShare, stopShare, screenShares } = useScreenShare(room, playerName);
   const screenStream = Array.from(screenShares.values())[0]?.stream ?? null;
 
   useEffect(() => {
