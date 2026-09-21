@@ -497,7 +497,10 @@ export function RoomPage() {
                   onChange={(e) => setChatInput(e.target.value)}
                   onFocus={handleChatFocus}
                   onBlur={handleChatBlur}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitChat(); } }}
+                  onKeyDown={(e) => {
+                    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitChat(); }
+                  }}
                   placeholder="메시지 입력..."
                   className="flex-1 text-sm text-[#17171b] placeholder:text-[#b2b2b2] outline-none bg-transparent"
                 />
