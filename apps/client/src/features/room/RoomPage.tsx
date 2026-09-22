@@ -109,11 +109,9 @@ export function RoomPage() {
   const isPresenter = user?.role === "admin" || user?.role === "mentor";
 
   const screenShareList = Array.from(screenShares.values());
-  const activeShare = screenShareList.length === 1
-    ? screenShareList[0]
-    : selectedShareId != null
-      ? (screenShares.get(selectedShareId) ?? null)
-      : null;
+  const activeShare = selectedShareId != null
+    ? (screenShares.get(selectedShareId) ?? null)
+    : null;
 
   // Scroll chat to bottom on new message
   useEffect(() => {
@@ -450,11 +448,7 @@ export function RoomPage() {
                 <ScreenShareTile
                   key={entry.presenterId}
                   entry={entry}
-                  isSelected={
-                    screenShareList.length === 1
-                      ? true
-                      : selectedShareId === entry.presenterId
-                  }
+                  isSelected={selectedShareId === entry.presenterId}
                   onClick={() =>
                     setSelectedShareId((prev) =>
                       prev === entry.presenterId ? null : entry.presenterId
@@ -470,7 +464,7 @@ export function RoomPage() {
             <ScreenShareOverlay
               stream={activeShare.stream}
               presenterName={activeShare.presenterName}
-              onClose={screenShareList.length > 1 ? () => setSelectedShareId(null) : undefined}
+              onClose={() => setSelectedShareId(null)}
             />
           )}
         </div>
