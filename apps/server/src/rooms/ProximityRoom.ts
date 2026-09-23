@@ -14,6 +14,7 @@
 import * as Sentry from "@sentry/node";
 import { Room, Client } from "@colyseus/core";
 import jwt from "jsonwebtoken";
+import { monitorEventLoopDelay, type IntervalHistogram } from "node:perf_hooks";
 import { Player, ProximityRoomState } from "./schema/RoomState.js";
 import { computeProximityChanges } from "./logic/proximity.js";
 import { config } from "../config.js";
@@ -31,6 +32,17 @@ import type {
 // 히스테리시스 밴드: 150px 안에 들어오면 연결, 180px 밖으로 나가면 해제
 const CONNECT_THRESHOLD = 150;
 const DISCONNECT_THRESHOLD = 180;
+
+// 이벤트 루프 지연 히스토그램 — tick-delay 발생 원인을 GC pause vs sync work vs 기타로 구분하기 위해
+// 프로세스 전역으로 하나만 두고 tick-delay 로그 시 percentile을 함께 기록한다.
+let loopDelayHistogram: IntervalHistogram | null = null;
+function getLoopDelay() {
+  if (!loopDelayHistogram) {
+    loopDelayHistogram = monitorEventLoopDelay({ resolution: 20 });
+    loopDelayHistogram.enable();
+  }
+  return loopDelayHistogram;
+}
 
 export class ProximityRoom extends Room<ProximityRoomState> {
   /**
@@ -260,16 +272,30 @@ export class ProximityRoom extends Room<ProximityRoomState> {
     if (this.lastTickTime !== null) {
       const actual = now - this.lastTickTime;
       if (actual > 150) {
+        // 이벤트 루프 지연 (ns → ms) — 이 값이 tick delay 근처면 GC pause / sync work가 원인
+        const hist = getLoopDelay();
+        const loopMaxMs = Math.round(hist.max / 1e6);
+        const loopP99Ms = Math.round(hist.percentile(99) / 1e6);
+        const loopMeanMs = Math.round(hist.mean / 1e6);
+        const mem = process.memoryUsage();
         console.warn(JSON.stringify({
           type: "tick-delay",
           roomId: this.dbRoomId,
           expected: 100,
           actual,
           players: this.state.players.size,
+          heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
+          heapTotalMb: Math.round(mem.heapTotal / 1024 / 1024),
+          rssMb: Math.round(mem.rss / 1024 / 1024),
+          loopMaxMs,
+          loopP99Ms,
+          loopMeanMs,
         }));
+        // 다음 tick-delay 원인만 독립적으로 보기 위해 리셋
+        hist.reset();
         if (actual > 200) {
           Sentry.captureMessage(
-            `tick delay ${actual}ms in room ${this.dbRoomId} (${this.state.players.size} players)`,
+            `tick delay ${actual}ms in room ${this.dbRoomId} (${this.state.players.size} players, loopMax=${loopMaxMs}ms)`,
             "warning",
           );
         }
