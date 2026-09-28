@@ -38,9 +38,18 @@ Sentry.init({
 const app = express();
 app.use(express.json());
 
-// CORS 허용 — 개발 편의를 위해 전체 오픈. 프로덕션에서는 origin을 제한해야 한다.
-app.use((_req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+// CORS 허용 — CORS_ORIGINS env 화이트리스트. 기본값 "*"으로 현행 동작 유지.
+// 프로덕션에서 서브도메인 분할(api.like-zep.shop) 후 origin 좁힘.
+const corsOrigins = config.CORS_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean);
+const allowAllOrigins = corsOrigins.includes("*");
+app.use((req, res, next) => {
+  const reqOrigin = req.headers.origin;
+  if (allowAllOrigins) {
+    res.header("Access-Control-Allow-Origin", "*");
+  } else if (reqOrigin && corsOrigins.includes(reqOrigin)) {
+    res.header("Access-Control-Allow-Origin", reqOrigin);
+    res.header("Vary", "Origin");
+  }
   res.header("Access-Control-Allow-Headers", "*");
   res.header("Access-Control-Allow-Methods", "*");
   next();
