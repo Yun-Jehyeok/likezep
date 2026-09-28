@@ -1,0 +1,77 @@
+name: Deploy Client
+
+# S3 + CloudFront 이관 후 사용 (Phase B 이후).
+# Phase A 시점에는 S3 버킷/CloudFront distribution이 아직 없어 실제 실행하면 실패한다.
+# 계획 문서: docs/plans/s3-cloudfront-migration.md
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options: [staging, prod]
+        default: staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # push to master → prod (approval required via GitHub Environment protection rule)
+    # workflow_dispatch → 사용자가 선택한 environment
+    environment: ${{ inputs.environment || 'prod' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @mentoring/shared build
+
+      - name: Build client
+        env:
+          # VITE_* env는 빌드 타임에 번들에 삽입된다.
+          # Environment secrets/variables는 GitHub Environment(prod/staging)에서 각각 관리.
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_RELEASE: ${{ github.sha }}
+        run: pnpm --filter @mentoring/client build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      # /assets/* : Vite가 파일명에 해시를 붙이므로 immutable + 1년 캐시.
+      # index.html은 두 번째 스텝에서 별도 처리.
+      - name: Sync assets (immutable, 1y cache)
+        run: |
+          aws s3 sync apps/client/dist/ s3://${{ secrets.S3_BUCKET }}/ \
+            --delete \
+            --exclude "index.html" \
+            --cache-control "public, max-age=31536000, immutable"
+
+      # index.html : 배포마다 새 번들 참조가 바뀌므로 no-cache로 브라우저 재검증 강제.
+      # CloudFront에도 invalidation을 걸어 엣지 캐시를 즉시 무효화.
+      - name: Upload index.html (no-cache)
+        run: |
+          aws s3 cp apps/client/dist/index.html s3://${{ secrets.S3_BUCKET }}/index.html \
+            --cache-control "no-cache" \
+            --content-type "text/html; charset=utf-8"
+
+      - name: Invalidate CloudFront (index.html only)
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/index.html"
