@@ -15,6 +15,9 @@ const schema = z.object({
   NODE_ENV: z.string().default("production"),
   SENTRY_DSN: z.string().optional(),
   SENTRY_RELEASE: z.string().optional(),
+  // Sentry environment tag. NODE_ENV와 분리 — 스테이징도 NODE_ENV=production으로 돌기 때문.
+  // 미설정 시 NODE_ENV로 fallback.
+  SENTRY_ENVIRONMENT: z.string().optional(),
   E2E_ENABLED: z.string().optional().transform((v) => v === "true"),
   MONITOR_PASSWORD: z.string().default("changeme"),
   // 콤마 구분 허용 origin 목록. "*"이면 전체 허용 (현행 동작 유지).
