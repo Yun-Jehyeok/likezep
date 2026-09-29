@@ -35,6 +35,8 @@ jobs:
 
       - run: pnpm --filter @mentoring/shared build
 
+      # Vite --mode에 따라 .env.staging vs .env.production 로드 + import.meta.env.MODE 결정.
+      # Sentry environment tag가 여기서 갈림 (client main.tsx의 Sentry.init).
       - name: Build client
         env:
           # VITE_* env는 빌드 타임에 번들에 삽입된다.
@@ -44,7 +46,7 @@ jobs:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           VITE_SENTRY_RELEASE: ${{ github.sha }}
-        run: pnpm --filter @mentoring/client build
+        run: pnpm --filter @mentoring/client ${{ (inputs.environment == 'staging') && 'build:staging' || 'build' }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
