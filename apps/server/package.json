@@ -11,6 +11,9 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx src/db/seed.ts"
   },
+  "prisma": {
+    "seed": "tsx src/db/seed.ts"
+  },
   "dependencies": {
     "@colyseus/core": "^0.16.0",
     "@colyseus/monitor": "^0.16.0",
