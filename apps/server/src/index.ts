@@ -30,7 +30,7 @@ import { config } from "./config.js";
 Sentry.init({
   dsn: config.SENTRY_DSN,
   enabled: !!config.SENTRY_DSN,
-  environment: config.NODE_ENV,
+  environment: config.SENTRY_ENVIRONMENT ?? config.NODE_ENV,
   release: config.SENTRY_RELEASE,
   tracesSampleRate: 0,  // 트랜잭션 트레이싱은 사용하지 않음 (에러만 수집)
 });
