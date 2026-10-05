@@ -96,8 +96,18 @@ pm2 startup systemd -u ubuntu --hp /home/ubuntu | tail -1 | bash || true
 
 # ─── 9. 방화벽 (UFW) — 기본 정책 ──────────────────────────────────────────
 # EC2 Security Group이 primary 방어층이지만 이중 방어 차원.
+#
+# ⚠️ mediasoup worker 포트(40000-49151/UDP)는 코드 하드코딩이라 반드시 열어야 함.
+#    apps/server/src/mediasoup/worker.ts의 rtcMinPort/rtcMaxPort 참조.
+#    coturn relay(49152-65535/UDP)와 "WebRTC 관련 UDP"로 묶어서 생각하면 누락됨.
+#    (2026-10-01 Phase B.3 검증 Step 4 블로커 → docs/troubleshooting/2026-09-29-phase-b3-staging-buildup.md §11)
 log "9. UFW 기본 정책 (참고용, 실 적용은 수동)"
-echo "  → UFW는 수동 활성화. 필요 포트: 22(SSH), 80/443(HTTP/S), 3478/UDP(TURN), 49152-65535/UDP(TURN relay)"
+echo "  → UFW는 수동 활성화. 필요 포트:"
+echo "     22/TCP           SSH"
+echo "     80/TCP, 443/TCP  HTTP/S"
+echo "     3478/UDP         coturn TURN signal"
+echo "     40000-49151/UDP  mediasoup worker (RTP) — ⚠️ coturn과 별개"
+echo "     49152-65535/UDP  coturn TURN relay"
 
 log "==================================================="
 log "자동화 부분 완료. 아래 수동 단계를 이어서 진행:"
@@ -105,6 +115,24 @@ log "==================================================="
 cat <<'MANUAL'
 
 [수동 단계 — Phase B checklist]
+
+M0. EC2 Security Group inbound rules — ⚠️ 이 스크립트 실행 전 세팅 완료 전제
+    EC2 생성 시 SG에 다음 inbound 규칙이 **모두** 있어야 함:
+
+      22/TCP           SSH My IP          (Connect SSH)
+      80/TCP           HTTP 0.0.0.0/0     (certbot HTTP-01 challenge + renew)
+      443/TCP          HTTPS 0.0.0.0/0    (API + WSS)
+      3478/UDP         0.0.0.0/0          (coturn TURN signal)
+      40000-49151/UDP  0.0.0.0/0          (mediasoup worker RTP)        ← ⚠️ 쉽게 누락
+      49152-65535/UDP  0.0.0.0/0          (coturn TURN relay)
+
+    확인 명령:
+      aws ec2 describe-security-groups --group-names likezep-staging-sg \
+        --query "SecurityGroups[0].IpPermissions[]" --output table
+
+    40000-49151(mediasoup worker)이 빠지면 화면공유 수신측 bytesReceived=0 (검은 화면).
+    Phase B.3 Step 4 블로커 사례(2026-10-01 발견 → 2026-10-05 해결):
+      docs/troubleshooting/2026-09-29-phase-b3-staging-buildup.md §11
 
 M1. Route53 hosted zone 생성 (like-zep.shop) — 이 시점엔 NS 전환 X
     aws route53 create-hosted-zone --name like-zep.shop --caller-reference $(date +%s)
