@@ -24,6 +24,9 @@ export class KeyboardInput {
   }
 
   private onKeyDown(e: KeyboardEvent) {
+    // Mac에서 Cmd 조합(Cmd+S 등)은 Cmd가 눌린 동안 다른 키의 keyup이 발행 안 됨 → 키가 Set에 stuck되어 아바타가 계속 이동.
+    // Cmd/Ctrl 조합은 브라우저 단축키이지 게임 입력이 아니므로 add 자체를 스킵한다.
+    if (e.metaKey || e.ctrlKey) return;
     // e.key를 소문자로 정규화해 isDown("w")와 isDown("W") 모두 동작하게 한다
     this.keys.add(e.key.toLowerCase());
   }
