@@ -29,6 +29,9 @@ export interface PlayerInfo {
   name: string;
   x: number;
   y: number;
+  timerStatus: string;
+  timerAccumulatedSec: number;
+  timerStartedAt: number;
 }
 
 /** RoomPage가 구현해야 할 이벤트 콜백 인터페이스 */
@@ -36,6 +39,7 @@ export interface RoomCallbacks {
   onPlayerJoin(sessionId: string, player: PlayerInfo): void;
   onPlayerLeave(sessionId: string): void;
   onPlayerMove(sessionId: string, x: number, y: number): void;
+  onPlayerTimerChange(sessionId: string, status: string, acc: number, startedAt: number): void;
   onProximityConnect(peerId: string, isOfferer: boolean): void;
   onProximityDisconnect(peerId: string): void;
   onWebRtcOffer(from: string, sdp: RTCSessionDescriptionInit): void;
@@ -58,10 +62,15 @@ function attachCallbacks(room: Room, callbacks: RoomCallbacks) {
       name: player.name,
       x: player.x,
       y: player.y,
+      timerStatus: player.timerStatus,
+      timerAccumulatedSec: player.timerAccumulatedSec,
+      timerStartedAt: player.timerStartedAt,
     });
-    // 개별 Player의 필드(x, y)가 바뀔 때마다 onPlayerMove 호출
+    // 개별 Player의 필드가 바뀔 때마다 호출. onChange는 어떤 필드가 바뀌었는지 알려주지 않으므로
+    // move/timer 양쪽 콜백 모두 발화하고, 수신 측에서 변경 감지 후 setState (불변성 체크 또는 noop).
     ($(player) as any).onChange(() => {
       callbacks.onPlayerMove(sessionId, player.x, player.y);
+      callbacks.onPlayerTimerChange(sessionId, player.timerStatus, player.timerAccumulatedSec, player.timerStartedAt);
     });
   }, true);
 

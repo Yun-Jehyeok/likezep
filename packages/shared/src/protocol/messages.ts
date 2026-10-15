@@ -41,6 +41,9 @@ export interface ScreenShareStartPayload { producerId: string }
 /** 화면공유 종료 — payload가 없지만 타입 안전성을 위해 빈 객체 타입을 정의 */
 export interface ScreenShareStopPayload { _?: never }
 
+/** 공부시간 타이머 액션 — payload 없음 (유저는 자기 타이머만 조작) */
+export interface TimerActionPayload { _?: never }
+
 /**
  * 클라이언트가 서버로 보낼 수 있는 모든 메시지의 유니온 타입.
  * Colyseus의 room.send(type, payload) 호출 시 타입 검사에 사용된다.
@@ -53,7 +56,10 @@ export type ClientToServerMessages =
   | { type: "webrtc-answer"; payload: WebRtcSignalPayload }
   | { type: "webrtc-ice"; payload: WebRtcSignalPayload }
   | { type: "screenshare-start"; payload: ScreenShareStartPayload }
-  | { type: "screenshare-stop"; payload: ScreenShareStopPayload };
+  | { type: "screenshare-stop"; payload: ScreenShareStopPayload }
+  | { type: "timer-start"; payload: TimerActionPayload }
+  | { type: "timer-pause"; payload: TimerActionPayload }
+  | { type: "timer-stop"; payload: TimerActionPayload };
 
 // ──────────────────────────────────────────────────────────────
 // Server → Client 메시지 페이로드 타입

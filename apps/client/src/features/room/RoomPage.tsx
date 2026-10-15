@@ -44,6 +44,7 @@ import { useScreenShare } from "../screenshare/useScreenShare.js";
 import { ScreenShareOverlay } from "./ScreenShareOverlay.js";
 import { RoomSwitcher } from "./RoomSwitcher.js";
 import { playChatNotification } from "./chatNotificationSound.js";
+import { StudyTimerPanel, type PlayerTimer } from "./StudyTimerPanel.js";
 
 const NOTIF_SOUND_STORAGE_KEY = "chat-notif-sound";
 
@@ -92,6 +93,8 @@ export function RoomPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [remotePeers, setRemotePeers] = useState<Record<string, RemotePeer>>({});
   const [colyseusRoom, setColyseusRoom] = useState<Room | null>(null);
+  const [playerTimers, setPlayerTimers] = useState<Record<string, PlayerTimer>>({});
+  const [mySessionId, setMySessionId] = useState<string | null>(null);
 
   const { isSharing, startShare, stopShare, screenShares } = useScreenShare(colyseusRoom, user?.name ?? "");
   const [selectedShareId, setSelectedShareId] = useState<string | null>(null);
@@ -174,6 +177,8 @@ export function RoomPage() {
     setOccupants(0);
     setMessages([]);
     setRemotePeers({});
+    setPlayerTimers({});
+    setMySessionId(null);
     setHasMoreHistory(true);
     setLoadingHistory(false);
     scrollRestoreRef.current = null;
@@ -210,6 +215,15 @@ export function RoomPage() {
       onPlayerJoin: (sessionId, info) => {
         setOccupants((n) => n + 1);
         playerNamesRef.current.set(sessionId, info.name);
+        setPlayerTimers((prev) => ({
+          ...prev,
+          [sessionId]: {
+            name: info.name,
+            status: info.timerStatus,
+            acc: info.timerAccumulatedSec,
+            startedAt: info.timerStartedAt,
+          },
+        }));
         if (gameRef.current) {
           gameRef.current.addPlayer(sessionId, info);
         } else {
@@ -227,9 +241,23 @@ export function RoomPage() {
           delete next[sessionId];
           return next;
         });
+        setPlayerTimers((prev) => {
+          if (!prev[sessionId]) return prev;
+          const next = { ...prev };
+          delete next[sessionId];
+          return next;
+        });
       },
       onPlayerMove: (sessionId, x, y) => {
         gameRef.current?.movePlayer(sessionId, x, y);
+      },
+      onPlayerTimerChange: (sessionId, status, acc, startedAt) => {
+        setPlayerTimers((prev) => {
+          const curr = prev[sessionId];
+          if (!curr) return prev;
+          if (curr.status === status && curr.acc === acc && curr.startedAt === startedAt) return prev;
+          return { ...prev, [sessionId]: { ...curr, status, acc, startedAt } };
+        });
       },
       onProximityConnect: async (peerId, isOfferer) => {
         const iceServers = await getIceServers();
@@ -275,6 +303,7 @@ export function RoomPage() {
         roomRef.current = room;
         roomSendRef.current = (type, payload) => room.send(type, payload);
         setColyseusRoom(room);
+        setMySessionId(room.sessionId);
 
         // Listen to chat messages
         room.onMessage<ChatMessage>("chat", (msg) => {
@@ -517,6 +546,13 @@ export function RoomPage() {
         {/* 채팅 패널 */}
         {chatOpen && (
           <div className="w-72 bg-white border-l border-[#e4e4e4] flex flex-col shrink-0">
+            <StudyTimerPanel
+              timers={playerTimers}
+              mySessionId={mySessionId}
+              onStart={() => roomSendRef.current("timer-start", {})}
+              onPause={() => roomSendRef.current("timer-pause", {})}
+              onStop={() => roomSendRef.current("timer-stop", {})}
+            />
             <div className="h-11 flex items-center px-4 border-b border-[#e4e4e4]">
               <span className="text-sm font-semibold text-[#17171b]">채팅</span>
             </div>

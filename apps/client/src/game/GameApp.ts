@@ -83,6 +83,9 @@ export class GameApp {
       name: playerName,
       x: MAP_WIDTH / 2,
       y: MAP_HEIGHT / 2,
+      timerStatus: "stopped",
+      timerAccumulatedSec: 0,
+      timerStartedAt: 0,
     });
 
     return self;
