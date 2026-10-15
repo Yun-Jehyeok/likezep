@@ -55,6 +55,7 @@ export function GameScreen({ playerName }: Props) {
         onPlayerMove(sessionId, x, y) {
           updatePlayerPosition(sessionId, x, y);
         },
+        onPlayerTimerChange() { /* PoC는 타이머 UI 없음 */ },
         onProximityConnect(peerId, isOfferer) {
           if (!localStreamRef.current) return;
           if (isOfferer) {

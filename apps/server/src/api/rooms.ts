@@ -36,7 +36,9 @@ router.get("/", requireAuth, async (req, res) => {
 
 router.get("/:roomId/chat", requireAuth, async (req, res) => {
   try {
-    const messages = await getRecentMessages(req.params.roomId);
+    const raw = req.query.before;
+    const beforeId = typeof raw === "string" && /^\d+$/.test(raw) ? raw : undefined;
+    const messages = await getRecentMessages(req.params.roomId, { beforeId });
     res.json(messages);
   } catch (err) {
     Sentry.captureException(err);

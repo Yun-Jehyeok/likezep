@@ -4,11 +4,19 @@ export async function saveMessage(userId: string, roomId: string, content: strin
   await prisma.chatMessage.create({ data: { userId, roomId, content } });
 }
 
-export async function getRecentMessages(roomId: string, limit = 50) {
+export async function getRecentMessages(
+  roomId: string,
+  options: { beforeId?: string; limit?: number } = {},
+) {
+  const { beforeId, limit = 50 } = options;
+  // id는 BigInt autoincrement PK라 "id가 작다" = "더 과거". createdAt tie-break도 겸함.
   const msgs = await prisma.chatMessage.findMany({
-    where: { roomId },
+    where: {
+      roomId,
+      ...(beforeId ? { id: { lt: BigInt(beforeId) } } : {}),
+    },
     include: { user: { select: { name: true } } },
-    orderBy: { createdAt: "desc" },
+    orderBy: { id: "desc" },
     take: limit,
   });
   return msgs.reverse().map((m) => ({

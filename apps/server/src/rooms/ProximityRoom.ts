@@ -22,6 +22,7 @@ import { findRoomById } from "../db/roomRepository.js";
 import { findUserById } from "../db/userRepository.js";
 import { logAccess } from "../db/accessLogRepository.js";
 import { saveMessage } from "../db/chatRepository.js";
+import { getTimer, startTimer, pauseTimer, stopTimer, type TimerState } from "../services/studyTimer.js";
 import type { AuthPayload } from "../api/middleware/auth.js";
 import type {
   MovePayload,
@@ -60,6 +61,8 @@ export class ProximityRoom extends Room<ProximityRoomState> {
   private dbRoomId = "";
   /** sessionId → 표시 이름 매핑 (채팅/화면공유 이름 표시용) */
   private userNames = new Map<string, string>();
+  /** sessionId → DB userId 매핑 (타이머 자정 리셋 sync 용). 타이머 상태는 유저 단위라 세션 → 유저 매핑이 필요. */
+  private userIdBySession = new Map<string, string>();
   /** 틱 딜레이 측정용: 이전 틱의 타임스탬프 */
   private lastTickTime: number | null = null;
 
@@ -151,6 +154,41 @@ export class ProximityRoom extends Room<ProximityRoomState> {
       this.currentShares.delete(client.sessionId);
       this.broadcast("screenshare-stopped", { presenterId: client.sessionId }, { except: client });
     });
+
+    // ── 공부시간 타이머 (유저별 서버 메모리 상태 → Colyseus state 반영) ──
+    this.onMessage("timer-start", (client: Client) => {
+      const userId = this.userIdBySession.get(client.sessionId);
+      if (!userId) return;
+      this.applyTimerToPlayer(client.sessionId, startTimer(userId));
+    });
+    this.onMessage("timer-pause", (client: Client) => {
+      const userId = this.userIdBySession.get(client.sessionId);
+      if (!userId) return;
+      this.applyTimerToPlayer(client.sessionId, pauseTimer(userId));
+    });
+    this.onMessage("timer-stop", (client: Client) => {
+      const userId = this.userIdBySession.get(client.sessionId);
+      if (!userId) return;
+      this.applyTimerToPlayer(client.sessionId, stopTimer(userId));
+    });
+
+    // 매 분 자정 체크: getTimer()의 lazy 리셋을 끌어내 player state에 반영.
+    // 유저가 아무 액션 안 해도 KST 자정 지나면 state가 0으로 돌아온다.
+    this.clock.setInterval(() => this.syncAllTimers(), 60_000);
+  }
+
+  private applyTimerToPlayer(sessionId: string, t: TimerState) {
+    const player = this.state.players.get(sessionId);
+    if (!player) return;
+    player.timerStatus = t.status;
+    player.timerAccumulatedSec = t.accumulatedSec;
+    player.timerStartedAt = t.startedAt;
+  }
+
+  private syncAllTimers() {
+    for (const [sessionId, userId] of this.userIdBySession) {
+      this.applyTimerToPlayer(sessionId, getTimer(userId));
+    }
   }
 
   /**
@@ -189,6 +227,7 @@ export class ProximityRoom extends Room<ProximityRoomState> {
     const auth = client.auth as AuthPayload | undefined;
     const displayName = options.name ?? auth?.userId ?? "Anonymous";
     this.userNames.set(client.sessionId, displayName);
+    if (auth?.userId) this.userIdBySession.set(client.sessionId, auth.userId);
 
     const player = new Player();
     player.id = client.sessionId;
@@ -196,6 +235,13 @@ export class ProximityRoom extends Room<ProximityRoomState> {
     // 맵 중앙(400, 300) 근처 랜덤 위치에서 스폰 (겹침 방지)
     player.x = 400 + (Math.random() * 100 - 50);
     player.y = 300 + (Math.random() * 100 - 50);
+    // 입장 시 서버 메모리의 현재 타이머 상태(자정 리셋 포함)를 초기값으로 반영.
+    if (auth?.userId) {
+      const t = getTimer(auth.userId);
+      player.timerStatus = t.status;
+      player.timerAccumulatedSec = t.accumulatedSec;
+      player.timerStartedAt = t.startedAt;
+    }
     this.state.players.set(client.sessionId, player);
 
     // 입장 시 이미 진행 중인 화면공유가 있으면 즉시 알림
@@ -217,6 +263,7 @@ export class ProximityRoom extends Room<ProximityRoomState> {
   onLeave(client: Client) {
     const auth = client.auth as AuthPayload | undefined;
     this.userNames.delete(client.sessionId);
+    this.userIdBySession.delete(client.sessionId);
     if (auth?.userId && this.dbRoomId) {
       logAccess(auth.userId, this.dbRoomId, "leave").catch(console.error);
     }

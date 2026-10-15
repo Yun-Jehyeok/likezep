@@ -24,7 +24,7 @@
  * - joinRoom() 완료 전에 onPlayerJoin 이벤트가 먼저 오면 GameApp이 아직 없다
  * - pendingPlayers에 쌓아뒀다가 GameApp이 만들어진 후 일괄 처리한다
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import type { Room } from "colyseus.js";
 import { useAuthStore } from "../../app/store.js";
@@ -44,6 +44,7 @@ import { useScreenShare } from "../screenshare/useScreenShare.js";
 import { ScreenShareOverlay } from "./ScreenShareOverlay.js";
 import { RoomSwitcher } from "./RoomSwitcher.js";
 import { playChatNotification } from "./chatNotificationSound.js";
+import { StudyTimerPanel, type PlayerTimer } from "./StudyTimerPanel.js";
 
 const NOTIF_SOUND_STORAGE_KEY = "chat-notif-sound";
 
@@ -92,6 +93,8 @@ export function RoomPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [remotePeers, setRemotePeers] = useState<Record<string, RemotePeer>>({});
   const [colyseusRoom, setColyseusRoom] = useState<Room | null>(null);
+  const [playerTimers, setPlayerTimers] = useState<Record<string, PlayerTimer>>({});
+  const [mySessionId, setMySessionId] = useState<string | null>(null);
 
   const { isSharing, startShare, stopShare, screenShares } = useScreenShare(colyseusRoom, user?.name ?? "");
   const [selectedShareId, setSelectedShareId] = useState<string | null>(null);
@@ -104,6 +107,11 @@ export function RoomPage() {
   const playerNamesRef = useRef<Map<string, string>>(new Map());
   const pendingPlayers = useRef<[string, PlayerInfo][]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  // prepend 직전 scrollHeight/scrollTop을 저장. 로드 후 scrollTop을 보정해 "보던 위치" 유지.
+  const scrollRestoreRef = useRef<{ height: number; top: number } | null>(null);
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const roomName = (location.state as { roomName?: string } | null)?.roomName ?? roomId;
   const isPresenter = user?.role === "admin" || user?.role === "mentor";
@@ -113,10 +121,43 @@ export function RoomPage() {
     ? (screenShares.get(selectedShareId) ?? null)
     : null;
 
-  // Scroll chat to bottom on new message
-  useEffect(() => {
+  // 과거 메시지 prepend 시엔 scrollTop 보정으로 "보던 위치" 유지, 그 외(초기 로드/새 메시지)엔 하단 자동 스크롤.
+  // useLayoutEffect: paint 전 조정으로 flicker 방지.
+  useLayoutEffect(() => {
+    const el = chatScrollRef.current;
+    if (scrollRestoreRef.current && el) {
+      const { height, top } = scrollRestoreRef.current;
+      el.scrollTop = el.scrollHeight - height + top;
+      scrollRestoreRef.current = null;
+      return;
+    }
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  async function handleChatScroll() {
+    const el = chatScrollRef.current;
+    if (!el || loadingHistory || !hasMoreHistory || !roomId) return;
+    if (el.scrollTop > 80) return;
+    const firstId = messages[0]?.id;
+    if (!firstId) return;
+
+    scrollRestoreRef.current = { height: el.scrollHeight, top: el.scrollTop };
+    setLoadingHistory(true);
+    try {
+      const older = await api.get<ChatMessage[]>(`/api/rooms/${roomId}/chat?before=${firstId}`);
+      if (older.length < 50) setHasMoreHistory(false);
+      if (older.length > 0) {
+        setMessages((prev) => [...older, ...prev]);
+      } else {
+        scrollRestoreRef.current = null;
+      }
+    } catch (err) {
+      console.error("[chat] load older failed:", err);
+      scrollRestoreRef.current = null;
+    } finally {
+      setLoadingHistory(false);
+    }
+  }
 
   // 오디오 출력 장치 목록 — 마운트 시 초기 로드, 기기 연결/해제 시 갱신
   useEffect(() => {
@@ -136,6 +177,11 @@ export function RoomPage() {
     setOccupants(0);
     setMessages([]);
     setRemotePeers({});
+    setPlayerTimers({});
+    setMySessionId(null);
+    setHasMoreHistory(true);
+    setLoadingHistory(false);
+    scrollRestoreRef.current = null;
 
     let cancelled = false;
     const canvas = canvasRef.current;
@@ -169,6 +215,15 @@ export function RoomPage() {
       onPlayerJoin: (sessionId, info) => {
         setOccupants((n) => n + 1);
         playerNamesRef.current.set(sessionId, info.name);
+        setPlayerTimers((prev) => ({
+          ...prev,
+          [sessionId]: {
+            name: info.name,
+            status: info.timerStatus,
+            acc: info.timerAccumulatedSec,
+            startedAt: info.timerStartedAt,
+          },
+        }));
         if (gameRef.current) {
           gameRef.current.addPlayer(sessionId, info);
         } else {
@@ -186,9 +241,23 @@ export function RoomPage() {
           delete next[sessionId];
           return next;
         });
+        setPlayerTimers((prev) => {
+          if (!prev[sessionId]) return prev;
+          const next = { ...prev };
+          delete next[sessionId];
+          return next;
+        });
       },
       onPlayerMove: (sessionId, x, y) => {
         gameRef.current?.movePlayer(sessionId, x, y);
+      },
+      onPlayerTimerChange: (sessionId, status, acc, startedAt) => {
+        setPlayerTimers((prev) => {
+          const curr = prev[sessionId];
+          if (!curr) return prev;
+          if (curr.status === status && curr.acc === acc && curr.startedAt === startedAt) return prev;
+          return { ...prev, [sessionId]: { ...curr, status, acc, startedAt } };
+        });
       },
       onProximityConnect: async (peerId, isOfferer) => {
         const iceServers = await getIceServers();
@@ -234,6 +303,7 @@ export function RoomPage() {
         roomRef.current = room;
         roomSendRef.current = (type, payload) => room.send(type, payload);
         setColyseusRoom(room);
+        setMySessionId(room.sessionId);
 
         // Listen to chat messages
         room.onMessage<ChatMessage>("chat", (msg) => {
@@ -246,7 +316,11 @@ export function RoomPage() {
 
         // Load chat history
         api.get<ChatMessage[]>(`/api/rooms/${roomId}/chat`)
-          .then((history) => { if (!cancelled) setMessages(history); })
+          .then((history) => {
+            if (cancelled) return;
+            setMessages(history);
+            if (history.length < 50) setHasMoreHistory(false);
+          })
           .catch(console.error);
 
         // Init PixiJS
@@ -472,11 +546,25 @@ export function RoomPage() {
         {/* 채팅 패널 */}
         {chatOpen && (
           <div className="w-72 bg-white border-l border-[#e4e4e4] flex flex-col shrink-0">
+            <StudyTimerPanel
+              timers={playerTimers}
+              mySessionId={mySessionId}
+              onStart={() => roomSendRef.current("timer-start", {})}
+              onPause={() => roomSendRef.current("timer-pause", {})}
+              onStop={() => roomSendRef.current("timer-stop", {})}
+            />
             <div className="h-11 flex items-center px-4 border-b border-[#e4e4e4]">
               <span className="text-sm font-semibold text-[#17171b]">채팅</span>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+            <div
+              ref={chatScrollRef}
+              onScroll={handleChatScroll}
+              className="flex-1 overflow-y-auto p-3 flex flex-col gap-2"
+            >
+              {loadingHistory && (
+                <p className="text-[#b2b2b2] text-xs text-center py-2">이전 메시지 불러오는 중...</p>
+              )}
               {messages.length === 0 ? (
                 <p className="text-[#b2b2b2] text-xs text-center py-6">아직 메시지가 없어요</p>
               ) : (

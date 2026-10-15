@@ -18,9 +18,22 @@ export class Player extends Schema {
   name: string = "";
   x: number = 400;  // 맵 중앙 근처에서 시작
   y: number = 300;
+  // 공부시간 타이머 — 서버가 유저별 메모리 상태를 Colyseus state에 반영.
+  // 클라는 running일 때 accumulatedSec + (now - startedAt)으로 "현재 초"를 계산해 live 표시한다.
+  timerStatus: string = "stopped"; // "running" | "paused" | "stopped"
+  timerAccumulatedSec: number = 0;
+  timerStartedAt: number = 0;      // epoch ms, running일 때만 유효
 }
 // "number"는 float64, "string"은 UTF-8로 인코딩된다
-defineTypes(Player, { id: "string", name: "string", x: "number", y: "number" });
+defineTypes(Player, {
+  id: "string",
+  name: "string",
+  x: "number",
+  y: "number",
+  timerStatus: "string",
+  timerAccumulatedSec: "number",
+  timerStartedAt: "number",
+});
 
 /**
  * 룸 전체 상태. MapSchema는 키-값 맵을 동기화하며,
