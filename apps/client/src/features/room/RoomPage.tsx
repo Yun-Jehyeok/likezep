@@ -301,7 +301,7 @@ export function RoomPage() {
       .then(async (room) => {
         if (cancelled) { room.leave(); return; }
         roomRef.current = room;
-        roomSendRef.current = (type, payload) => room.send(type, payload);
+        roomSendRef.current = (type, payload) => { if (room.connection.isOpen) room.send(type, payload); };
         setColyseusRoom(room);
         setMySessionId(room.sessionId);
 
