@@ -188,6 +188,7 @@ export class GameApp {
 
     const me = this.avatars.get(this.mySessionId);
     if (!me) return;
+    if (!this.room.connection.isOpen) return;
     // 정수로 반올림해 불필요한 소수점 전송을 줄인다
     this.room.send("move", { x: Math.round(me.x), y: Math.round(me.y) });
   }

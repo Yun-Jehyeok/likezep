@@ -95,6 +95,7 @@ export function RoomPage() {
   const [colyseusRoom, setColyseusRoom] = useState<Room | null>(null);
   const [playerTimers, setPlayerTimers] = useState<Record<string, PlayerTimer>>({});
   const [mySessionId, setMySessionId] = useState<string | null>(null);
+  const [wsDisconnected, setWsDisconnected] = useState(false);
 
   const { isSharing, startShare, stopShare, screenShares } = useScreenShare(colyseusRoom, user?.name ?? "");
   const [selectedShareId, setSelectedShareId] = useState<string | null>(null);
@@ -301,7 +302,9 @@ export function RoomPage() {
       .then(async (room) => {
         if (cancelled) { room.leave(); return; }
         roomRef.current = room;
-        roomSendRef.current = (type, payload) => room.send(type, payload);
+        roomSendRef.current = (type, payload) => { if (room.connection.isOpen) room.send(type, payload); };
+        // WebSocket이 예기치 않게 닫히면 "연결 끊김" 배너를 표시한다.
+        room.onLeave(() => { if (!cancelled) setWsDisconnected(true); });
         setColyseusRoom(room);
         setMySessionId(room.sessionId);
 
@@ -343,7 +346,7 @@ export function RoomPage() {
       localStreamRef.current = null;
       gameRef.current?.destroy();
       gameRef.current = null;
-      roomRef.current?.leave();
+      try { roomRef.current?.leave(); } catch { /* WebSocket already closing/closed */ }
       roomRef.current = null;
     };
   }, [roomId, token, user]);
@@ -468,6 +471,19 @@ export function RoomPage() {
 
   return (
     <div className="h-screen flex flex-col font-[Pretendard,sans-serif]">
+
+      {wsDisconnected && (
+        <div className="w-full bg-[#e03131] text-white text-xs text-center py-2 shrink-0">
+          서버 연결이 끊어졌습니다.
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="ml-2 underline font-semibold cursor-pointer"
+          >
+            새로고침
+          </button>
+        </div>
+      )}
 
       {/* 상단 헤더 */}
       <header className="h-14 bg-white border-b border-[#e4e4e4] flex items-center justify-between px-4 shrink-0">
