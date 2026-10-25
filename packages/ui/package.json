@@ -1,0 +1,18 @@
+{
+    "name": "@mentoring/ui",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "typecheck": "tsc --noEmit"
+    },
+    "devDependencies": {
+        "typescript": "*"
+    },
+    "dependencies": {
+        "zustand": "^5.0.16"
+    }
+}
