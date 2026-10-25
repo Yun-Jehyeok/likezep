@@ -21,7 +21,7 @@ interface Props {
 }
 
 function formatHMS(totalSec: number): string {
-  const safe = Math.max(0, totalSec);
+  const safe = Math.max(0, Number.isFinite(totalSec) ? totalSec : 0);
   const h = Math.floor(safe / 3600);
   const m = Math.floor((safe % 3600) / 60);
   const s = safe % 60;
