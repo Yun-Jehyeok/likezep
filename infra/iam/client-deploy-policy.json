@@ -1,0 +1,38 @@
+{
+  "_comment": [
+    "GH Actions 배포 워커용 최소권한 IAM 정책 템플릿.",
+    "S3 sync + CloudFront invalidation만 허용. 다른 AWS 리소스 접근 불가.",
+    "Phase B에서 프로덕션/스테이징 각각 IAM 유저 생성 시 사용.",
+    "ARN의 <BUCKET_NAME> / <DISTRIBUTION_ID>는 실제 값으로 치환할 것.",
+    "예: prod → likezep-client-prod / EXXXXXXXXXXXXX",
+    "    staging → likezep-client-staging / EYYYYYYYYYYYYY"
+  ],
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListBucketForSync",
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket"],
+      "Resource": "arn:aws:s3:::<BUCKET_NAME>"
+    },
+    {
+      "Sid": "ObjectReadWriteForSync",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::<BUCKET_NAME>/*"
+    },
+    {
+      "Sid": "InvalidateOnlyThisDistribution",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateInvalidation",
+        "cloudfront:GetInvalidation"
+      ],
+      "Resource": "arn:aws:cloudfront::<ACCOUNT_ID>:distribution/<DISTRIBUTION_ID>"
+    }
+  ]
+}

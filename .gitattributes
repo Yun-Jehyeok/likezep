@@ -1,0 +1,6 @@
+# Shell 스크립트는 Ubuntu에서 실행되므로 LF 강제.
+# Windows에서 편집해도 커밋 시 LF로 저장됨.
+*.sh text eol=lf
+
+# nginx 설정 파일도 Linux 실행 대상.
+*.conf text eol=lf

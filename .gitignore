@@ -3,7 +3,6 @@ dist/
 .env
 *.env.local
 .pnpm-store/
-pnpm-lock.yaml
 
 # TypeScript 빌드 캐시
 *.tsbuildinfo

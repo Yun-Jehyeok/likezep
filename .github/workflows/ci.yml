@@ -3,7 +3,8 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [master]
+  workflow_dispatch:
 
 jobs:
   check:
@@ -15,10 +16,17 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      # typecheck는 shared의 .d.ts와 prisma client의 생성된 타입을 요구
+      - run: pnpm --filter @mentoring/shared build
+      - run: pnpm --filter @mentoring/server exec prisma generate
       - run: pnpm check
 
+  # E2E는 실 서버(like-zep.shop 또는 PLAYWRIGHT_BASE_URL)에 접속하는 통합 테스트.
+  # 매 PR/push 때 돌면 프로덕션을 두드리게 되므로 수동 트리거(workflow_dispatch)로만 실행.
+  # 사용: Actions 탭 → CI → Run workflow
   e2e:
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
     needs: check
     steps:
       - uses: actions/checkout@v4
@@ -27,5 +35,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mentoring/shared build
+      - run: pnpm --filter @mentoring/server exec prisma generate
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e

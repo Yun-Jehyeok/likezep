@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "dev": "pnpm --parallel -r dev",
-    "check": "pnpm -r typecheck && pnpm -r lint && pnpm depcruise",
+    "lint": "eslint apps packages",
+    "check": "pnpm -r typecheck && pnpm lint && pnpm depcruise",
     "test": "pnpm -r test",
     "test:e2e": "playwright test",
     "depcruise": "depcruise --validate .dependency-cruiser.cjs apps packages",
@@ -14,6 +15,7 @@
     "@eslint/js": "^9.0.0",
     "@playwright/test": "^1.45.0",
     "dependency-cruiser": "^16.0.0",
+    "eslint": "^10.7.0",
     "globals": "^15.0.0",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.0.0",
