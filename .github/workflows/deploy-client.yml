@@ -13,8 +13,8 @@ on:
         description: 'Target environment'
         required: true
         type: choice
-        options: [staging, prod]
-        default: staging
+        options: [prod, staging]
+        default: prod
 
 jobs:
   deploy:
