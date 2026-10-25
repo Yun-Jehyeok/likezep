@@ -62,15 +62,15 @@ function attachCallbacks(room: Room, callbacks: RoomCallbacks) {
       name: player.name,
       x: player.x,
       y: player.y,
-      timerStatus: player.timerStatus,
-      timerAccumulatedSec: player.timerAccumulatedSec,
-      timerStartedAt: player.timerStartedAt,
+      timerStatus: player.timerStatus ?? "stopped",
+      timerAccumulatedSec: player.timerAccumulatedSec ?? 0,
+      timerStartedAt: player.timerStartedAt ?? 0,
     });
     // 개별 Player의 필드가 바뀔 때마다 호출. onChange는 어떤 필드가 바뀌었는지 알려주지 않으므로
     // move/timer 양쪽 콜백 모두 발화하고, 수신 측에서 변경 감지 후 setState (불변성 체크 또는 noop).
     ($(player) as any).onChange(() => {
       callbacks.onPlayerMove(sessionId, player.x, player.y);
-      callbacks.onPlayerTimerChange(sessionId, player.timerStatus, player.timerAccumulatedSec, player.timerStartedAt);
+      callbacks.onPlayerTimerChange(sessionId, player.timerStatus ?? "stopped", player.timerAccumulatedSec ?? 0, player.timerStartedAt ?? 0);
     });
   }, true);
 
