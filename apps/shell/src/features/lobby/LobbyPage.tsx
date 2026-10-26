@@ -55,51 +55,28 @@ export function LobbyPage() {
             <header className="bg-white border-b border-border px-6 h-14 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2.5">
                     <div className="w-7 h-7 rounded-lg bg-[#0071ff] flex items-center justify-center">
-                        <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 22 22"
-                            fill="none"
-                        >
-                            <path
-                                d="M4 5h14M4 11h14M4 17h8"
-                                stroke="white"
-                                strokeWidth="2.2"
-                                strokeLinecap="round"
-                            />
+                        <svg width="14" height="14" viewBox="0 0 22 22" fill="none">
+                            <path d="M4 5h14M4 11h14M4 17h8" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
                         </svg>
                     </div>
-                    <span className="text-[15px] font-bold text-text-primary">
-                        멘토링 플랫폼
-                    </span>
+                    <span className="text-[15px] font-bold text-text-primary">멘토링 플랫폼</span>
                 </div>
 
                 <div className="flex items-center gap-3">
+                    <div className="text-sm text-text-primary font-medium cursor-pointer" onClick={() => navigate("/learn")}>
+                        강의실
+                    </div>
                     {user?.role === "admin" && (
-                        <button
-                            type="button"
-                            onClick={() => navigate("/admin")}
-                            className="text-sm text-[#0071ff] font-medium hover:text-primary-hover transition-colors cursor-pointer"
-                        >
+                        <button type="button" onClick={() => navigate("/admin")} className="text-sm text-[#0071ff] font-medium hover:text-primary-hover transition-colors cursor-pointer">
                             관리 대시보드
                         </button>
                     )}
                     <div className="flex items-center gap-2">
-                        <span className="text-sm text-text-primary font-medium">
-                            {user?.name}
-                        </span>
-                        <span
-                            className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${ROLE_STYLE[user?.role ?? "mentee"]}`}
-                        >
-                            {ROLE_LABEL[user?.role ?? "mentee"]}
-                        </span>
+                        <span className="text-sm text-text-primary font-medium">{user?.name}</span>
+                        <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${ROLE_STYLE[user?.role ?? "mentee"]}`}>{ROLE_LABEL[user?.role ?? "mentee"]}</span>
                     </div>
                     <div className="w-px h-4 bg-border" />
-                    <button
-                        type="button"
-                        onClick={handleLogout}
-                        className="text-sm text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
-                    >
+                    <button type="button" onClick={handleLogout} className="text-sm text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
                         로그아웃
                     </button>
                 </div>
@@ -108,12 +85,8 @@ export function LobbyPage() {
             {/* 본문 */}
             <main className="flex-1 max-w-5xl w-full mx-auto px-6 py-8">
                 <div className="mb-6">
-                    <h2 className="text-xl font-bold text-text-primary">
-                        입장 가능한 공간
-                    </h2>
-                    <p className="text-sm text-text-secondary mt-1">
-                        공간을 선택하면 바로 입장합니다
-                    </p>
+                    <h2 className="text-xl font-bold text-text-primary">입장 가능한 공간</h2>
+                    <p className="text-sm text-text-secondary mt-1">공간을 선택하면 바로 입장합니다</p>
                 </div>
 
                 {loading && (
@@ -122,11 +95,7 @@ export function LobbyPage() {
                     </div>
                 )}
 
-                {error && (
-                    <div className="px-4 py-3 rounded-xl bg-[#fff1f0] border border-[#ffd6d3] text-[#e03131] text-sm">
-                        {error}
-                    </div>
-                )}
+                {error && <div className="px-4 py-3 rounded-xl bg-[#fff1f0] border border-[#ffd6d3] text-[#e03131] text-sm">{error}</div>}
 
                 {!loading && !error && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -148,13 +117,7 @@ export function LobbyPage() {
     );
 }
 
-function RoomCardItem({
-    room,
-    onClick,
-}: {
-    room: RoomCard;
-    onClick: () => void;
-}) {
+function RoomCardItem({ room, onClick }: { room: RoomCard; onClick: () => void }) {
     const isEmpty = room.occupants === 0;
 
     return (
@@ -167,30 +130,16 @@ function RoomCardItem({
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-background group-hover:bg-primary-light transition-colors">
                     {room.type === "public" ? <PublicIcon /> : <PrivateIcon />}
                 </div>
-                <span
-                    className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
-                        room.type === "public"
-                            ? "bg-[#e8f7ee] text-[#1a7a3f]"
-                            : "bg-[#f0ebff] text-[#6b21e8]"
-                    }`}
-                >
+                <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${room.type === "public" ? "bg-[#e8f7ee] text-[#1a7a3f]" : "bg-[#f0ebff] text-[#6b21e8]"}`}>
                     {room.type === "public" ? "공용" : "프라이빗"}
                 </span>
             </div>
 
-            <p className="text-[16px] font-semibold text-text-primary group-hover:text-[#0071ff] transition-colors mb-1">
-                {room.name}
-            </p>
+            <p className="text-[16px] font-semibold text-text-primary group-hover:text-[#0071ff] transition-colors mb-1">{room.name}</p>
 
             <div className="flex items-center gap-1.5">
-                <span
-                    className={`w-1.5 h-1.5 rounded-full ${isEmpty ? "bg-text-disabled" : "bg-[#22c55e]"}`}
-                />
-                <span
-                    className={`text-sm ${isEmpty ? "text-text-disabled" : "text-text-secondary"}`}
-                >
-                    {isEmpty ? "비어 있음" : `${room.occupants}명 접속 중`}
-                </span>
+                <span className={`w-1.5 h-1.5 rounded-full ${isEmpty ? "bg-text-disabled" : "bg-[#22c55e]"}`} />
+                <span className={`text-sm ${isEmpty ? "text-text-disabled" : "text-text-secondary"}`}>{isEmpty ? "비어 있음" : `${room.occupants}명 접속 중`}</span>
             </div>
         </button>
     );
