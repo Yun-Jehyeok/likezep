@@ -7,6 +7,7 @@ import { LobbyPage } from "../features/lobby/LobbyPage";
 import { AdminPage } from "../features/admin/AdminPage";
 
 const RoomApp = lazy(() => import("room/App"));
+const LearnApp = lazy(() => import("learn/App"));
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
     const user = useAuthStore((s) => s.user);
@@ -56,6 +57,16 @@ function AppRouter() {
                         <Suspense>
                             <RequireAssigned>
                                 <RoomApp />
+                            </RequireAssigned>
+                        </Suspense>
+                    }
+                />
+                <Route
+                    path="/learn/*"
+                    element={
+                        <Suspense>
+                            <RequireAssigned>
+                                <LearnApp />
                             </RequireAssigned>
                         </Suspense>
                     }

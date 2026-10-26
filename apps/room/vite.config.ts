@@ -11,10 +11,15 @@ export default defineConfig({
             name: "room",
             filename: "remoteEntry.js",
             exposes: { "./App": "./src/RoomApp.tsx" },
-            shared: { react: { singleton: true }, "react-dom": { singleton: true }, zustand: { singleton: true }, "@mentoring/ui": { singleton: true } },
+            shared: { react: { singleton: true }, "react-dom": { singleton: true }, zustand: { singleton: true }, "@mentoring/ui": { singleton: true }, "react-router-dom": { singleton: true } },
         }),
     ],
+    optimizeDeps: {
+        exclude: ["@tailwindcss/oxide"],
+        include: ["use-sync-external-store/shim/with-selector"],
+    },
     server: {
+        port: 5174,
         proxy: {
             "/api": "http://localhost:2567",
         },

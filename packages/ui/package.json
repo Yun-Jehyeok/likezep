@@ -13,6 +13,6 @@
         "typescript": "*"
     },
     "dependencies": {
-        "zustand": "^5.0.16"
+        "zustand": "^5.0.0"
     }
 }
