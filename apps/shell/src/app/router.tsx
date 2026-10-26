@@ -4,12 +4,20 @@ import { useAuthStore } from "@mentoring/ui";
 import { LoginPage } from "../features/auth/LoginPage";
 import { WaitingPage } from "../features/auth/WaitingPage";
 import { LobbyPage } from "../features/lobby/LobbyPage";
+import { AdminPage } from "../features/admin/AdminPage";
 
 const RoomApp = lazy(() => import("room/App"));
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
     const user = useAuthStore((s) => s.user);
     if (!user) return <Navigate to="/login" replace />;
+    return <>{children}</>;
+}
+
+function RequireAdmin({ children }: { children: React.ReactNode }) {
+    const user = useAuthStore((s) => s.user);
+    if (!user) return <Navigate to="/login" replace />;
+    if (user.role !== "admin") return <Navigate to="/lobby" replace />;
     return <>{children}</>;
 }
 
@@ -52,6 +60,15 @@ function AppRouter() {
                         </Suspense>
                     }
                 />
+                <Route
+                    path="/admin"
+                    element={
+                        <RequireAdmin>
+                            <AdminPage />
+                        </RequireAdmin>
+                    }
+                />
+
                 <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
         </BrowserRouter>
