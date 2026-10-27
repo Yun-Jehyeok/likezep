@@ -21,6 +21,8 @@
     "@colyseus/ws-transport": "^0.16.0",
     "express-basic-auth": "^1.2.1",
     "@mentoring/shared": "workspace:*",
+    "@aws-sdk/client-s3": "^3.0.0",
+    "@aws-sdk/s3-request-presigner": "^3.0.0",
     "@prisma/client": "^6.0.0",
     "@sentry/node": "^10.70.0",
     "express": "^4.19.0",
