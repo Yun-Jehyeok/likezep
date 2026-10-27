@@ -33,9 +33,10 @@ model User {
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
   lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz
 
-  group        Group?        @relation(fields: [groupId], references: [id])
-  chatMessages ChatMessage[]
-  accessLogs   AccessLog[]
+  group          Group?               @relation(fields: [groupId], references: [id])
+  chatMessages   ChatMessage[]
+  accessLogs     AccessLog[]
+  lessonProgress UserLessonProgress[]
 
   @@index([groupId])
   @@map("users")
@@ -96,4 +97,72 @@ model AccessLog {
   @@index([userId, createdAt])
   @@index([roomId, createdAt])
   @@map("access_logs")
+}
+
+model Course {
+  id          Int        @id @default(autoincrement())
+  category    String
+  title       String
+  description String?
+  thumbnail   String?
+  order       Int        @default(0)
+  isPublished Boolean    @default(false) @map("is_published")
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+
+  lessons  Lesson[]
+  materials Material[]
+
+  @@index([category, isPublished])
+  @@map("courses")
+}
+
+model Lesson {
+  id          Int      @id @default(autoincrement())
+  courseId    Int      @map("course_id")
+  title       String
+  description String?
+  videoKey    String   @map("video_key")
+  duration    Int?
+  order       Int      @default(0)
+  isPublished Boolean  @default(false) @map("is_published")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  course   Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  progress UserLessonProgress[]
+
+  @@index([courseId, order])
+  @@map("lessons")
+}
+
+model Material {
+  id        Int      @id @default(autoincrement())
+  courseId  Int      @map("course_id")
+  name      String
+  fileKey   String   @map("file_key")
+  fileSize  Int?     @map("file_size")
+  order     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@map("materials")
+}
+
+model UserLessonProgress {
+  id             Int      @id @default(autoincrement())
+  userId         String   @map("user_id") @db.Uuid
+  courseId       Int      @map("course_id")
+  lessonId       Int      @map("lesson_id")
+  watchedSeconds Int      @default(0) @map("watched_seconds")
+  completed      Boolean  @default(false)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([userId, courseId])
+  @@map("user_lesson_progress")
 }
