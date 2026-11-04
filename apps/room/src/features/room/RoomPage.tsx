@@ -409,6 +409,7 @@ export function RoomPage() {
     }, [roomId, token, user]);
 
     function handleLeave() {
+        roomSendRef.current("timer-pause", {});
         setColyseusRoom(null);
         cleanupAllPeers();
         localStreamRef.current?.getTracks().forEach((t) => t.stop());
