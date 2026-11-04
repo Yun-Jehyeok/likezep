@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useGoogleLogin } from "@react-oauth/google";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createApiClient, useAuthStore } from "@mentoring/ui";
 
 const api = createApiClient(import.meta.env.VITE_API_URL);
@@ -17,10 +17,18 @@ interface AuthResponse {
 }
 
 export function LoginPage() {
+    const hasHydrated = useAuthStore((s) => s._hasHydrated);
+    const user = useAuthStore((s) => s.user);
     const setAuth = useAuthStore((s) => s.setAuth);
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // 이미 로그인된 상태면 적절한 페이지로 이동
+    useEffect(() => {
+        if (!hasHydrated || !user) return;
+        navigate(user.role === "mentee" && !user.groupId ? "/waiting" : "/lobby", { replace: true });
+    }, [hasHydrated, user, navigate]);
 
     function handleAuthSuccess(user: AuthResponse["user"], token: string) {
         setAuth(user, token);
