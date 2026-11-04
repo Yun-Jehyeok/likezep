@@ -10,13 +10,17 @@ const RoomApp = lazy(() => import("room/App"));
 const LearnApp = lazy(() => import("learn/App"));
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
+    const hydrated = useAuthStore((s) => s._hasHydrated);
     const user = useAuthStore((s) => s.user);
+    if (!hydrated) return null;
     if (!user) return <Navigate to="/login" replace />;
     return <>{children}</>;
 }
 
 function RequireAdmin({ children }: { children: React.ReactNode }) {
+    const hydrated = useAuthStore((s) => s._hasHydrated);
     const user = useAuthStore((s) => s.user);
+    if (!hydrated) return null;
     if (!user) return <Navigate to="/login" replace />;
     if (user.role !== "admin") return <Navigate to="/lobby" replace />;
     return <>{children}</>;
@@ -24,7 +28,9 @@ function RequireAdmin({ children }: { children: React.ReactNode }) {
 
 // 미배정 멘티가 로비/룸에 직접 접근하는 경우 차단
 function RequireAssigned({ children }: { children: React.ReactNode }) {
+    const hydrated = useAuthStore((s) => s._hasHydrated);
     const user = useAuthStore((s) => s.user);
+    if (!hydrated) return null;
     if (!user) return <Navigate to="/login" replace />;
     if (user.role === "mentee" && !user.groupId) return <Navigate to="/waiting" replace />;
     return <>{children}</>;

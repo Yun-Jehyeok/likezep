@@ -12,8 +12,10 @@ export interface AuthUser {
 }
 
 interface AuthStore {
+    _hasHydrated: boolean;
     user: AuthUser | null;
     token: string | null;
+    setHasHydrated: (v: boolean) => void;
     setAuth: (user: AuthUser, token: string) => void;
     setToken: (token: string) => void;
     updateUser: (partial: Partial<AuthUser>) => void;
@@ -23,8 +25,10 @@ interface AuthStore {
 export const useAuthStore = create<AuthStore>()(
     persist(
         (set) => ({
+            _hasHydrated: false,
             user: null,
             token: null,
+            setHasHydrated: (v) => set({ _hasHydrated: v }),
             setAuth: (user, token) => {
                 localStorage.setItem("auth_token", token);
                 set({ user, token });
@@ -45,10 +49,11 @@ export const useAuthStore = create<AuthStore>()(
         {
             name: "auth_store",
             storage: createJSONStorage(() => localStorage),
-            // 복구 시 auth_token도 localStorage에 재동기화
+            // _hasHydrated는 런타임 전용 — persist 대상에서 제외
+            partialize: (state) => ({ user: state.user, token: state.token }),
             onRehydrateStorage: () => (state) => {
-                if (state?.token)
-                    localStorage.setItem("auth_token", state.token);
+                if (state?.token) localStorage.setItem("auth_token", state.token);
+                state?.setHasHydrated(true);
             },
         },
     ),
