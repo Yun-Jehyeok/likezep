@@ -1,0 +1,67 @@
+name: Deploy Shell
+
+# apps/shell 또는 packages/** 변경 시 shell(host app)을 S3 루트에 배포.
+# S3 루트(/)에 sync하므로 --delete 미사용 — remotes/ prefix 실수 삭제 방지.
+# index.html만 no-cache, 나머지 Vite 해시 에셋은 immutable 1년 캐시.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'apps/shell/**'
+      - 'packages/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @mentoring/shared build
+
+      - run: pnpm --filter @mentoring/ui build
+
+      - name: Build shell
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_RELEASE: ${{ github.sha }}
+        run: pnpm --filter shell build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      # --delete 미사용: S3 루트에는 remotes/ prefix도 공존하므로 삭제하면 안 됨.
+      # 구 해시 에셋 파일이 남아도 무해 (파일명이 달라 충돌 없음).
+      - name: Sync assets (immutable, 1y cache)
+        run: |
+          aws s3 sync apps/shell/dist/ s3://${{ secrets.S3_BUCKET }}/ \
+            --exclude "index.html" \
+            --cache-control "public, max-age=31536000, immutable"
+
+      - name: Upload index.html (no-cache)
+        run: |
+          aws s3 cp apps/shell/dist/index.html s3://${{ secrets.S3_BUCKET }}/index.html \
+            --cache-control "no-cache" \
+            --content-type "text/html; charset=utf-8"
+
+      - name: Invalidate CloudFront (index.html only)
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/index.html"
