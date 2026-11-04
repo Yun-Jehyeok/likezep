@@ -15,6 +15,7 @@ interface AuthStore {
     user: AuthUser | null;
     token: string | null;
     setAuth: (user: AuthUser, token: string) => void;
+    setToken: (token: string) => void;
     updateUser: (partial: Partial<AuthUser>) => void;
     clearAuth: () => void;
 }
@@ -25,25 +26,29 @@ export const useAuthStore = create<AuthStore>()(
             user: null,
             token: null,
             setAuth: (user, token) => {
-                sessionStorage.setItem("auth_token", token);
+                localStorage.setItem("auth_token", token);
                 set({ user, token });
+            },
+            setToken: (token) => {
+                localStorage.setItem("auth_token", token);
+                set({ token });
             },
             updateUser: (partial) =>
                 set((s) => ({
                     user: s.user ? { ...s.user, ...partial } : null,
                 })),
             clearAuth: () => {
-                sessionStorage.removeItem("auth_token");
+                localStorage.removeItem("auth_token");
                 set({ user: null, token: null });
             },
         }),
         {
             name: "auth_store",
-            storage: createJSONStorage(() => sessionStorage),
-            // 복구 시 auth_token도 sessionStorage에 재동기화
+            storage: createJSONStorage(() => localStorage),
+            // 복구 시 auth_token도 localStorage에 재동기화
             onRehydrateStorage: () => (state) => {
                 if (state?.token)
-                    sessionStorage.setItem("auth_token", state.token);
+                    localStorage.setItem("auth_token", state.token);
             },
         },
     ),

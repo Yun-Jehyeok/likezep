@@ -386,6 +386,10 @@ export function RoomPage() {
 
                 for (const [sid, info] of pendingPlayers.current) game.addPlayer(sid, info);
                 pendingPlayers.current = [];
+
+                // 룸 입장(사용자 제스처 컨텍스트) 시점에 마이크 권한을 미리 요청해
+                // 이후 근접 화상 연결 시 브라우저 권한 팝업이 재등장하지 않도록 한다.
+                ensureLocalStream().catch(() => {});
             })
             .catch((err: Error) => {
                 if (!cancelled) setConnError(err?.message ?? "룸 연결에 실패했습니다.");

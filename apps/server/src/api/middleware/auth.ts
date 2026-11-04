@@ -53,7 +53,7 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-/** 주어진 payload로 JWT를 생성해 반환한다. 유효기간 24시간. */
+/** 주어진 payload로 JWT를 생성해 반환한다. 유효기간 7일 (sliding session). */
 export function issueToken(payload: AuthPayload): string {
-  return jwt.sign(payload, config.JWT_SECRET, { expiresIn: "24h" });
+  return jwt.sign(payload, config.JWT_SECRET, { expiresIn: "7d" });
 }

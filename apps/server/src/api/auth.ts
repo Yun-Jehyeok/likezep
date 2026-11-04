@@ -76,6 +76,12 @@ router.post("/google", async (req, res) => {
   }
 });
 
+// POST /api/auth/refresh  — 유효한 토큰으로 새 7일 토큰 발급 (sliding session)
+router.post("/refresh", requireAuth, (req, res) => {
+  const token = issueToken(req.auth!);
+  res.json({ token });
+});
+
 // GET /api/me  — 현재 유저 정보 반환 (그룹 배정 대기 중 폴링에 사용)
 // 멘티가 로그인 후 groupId가 배정됐는지 주기적으로 확인할 때 이 엔드포인트를 호출한다
 router.get("/me", requireAuth, async (req, res) => {
