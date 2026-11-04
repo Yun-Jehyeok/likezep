@@ -2,7 +2,7 @@ export function createApiClient(baseUrl: string) {
     function getToken(): string | null {
         // Zustand store는 모듈 밖에서 직접 접근 가능
         // store import 시 순환 의존성 방지를 위해 localStorage 경유
-        return sessionStorage.getItem("auth_token");
+        return localStorage.getItem("auth_token");
     }
 
     async function request<T>(
