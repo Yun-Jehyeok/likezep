@@ -4,9 +4,10 @@ name: Deploy Client
 # Phase A 시점에는 S3 버킷/CloudFront distribution이 아직 없어 실제 실행하면 실패한다.
 # 계획 문서: docs/plans/s3-cloudfront-migration.md
 
+# DEPRECATED: apps/client → apps/room 개편(MFA Phase 3)으로 이 워크플로우는 사용하지 않음.
+# 대체 워크플로우: deploy-shell.yml / deploy-room.yml / deploy-learn.yml
+# 자동 트리거 제거 — workflow_dispatch로만 수동 실행 가능 (실행 시 빌드 실패함).
 on:
-  push:
-    branches: [master]
   workflow_dispatch:
     inputs:
       environment:

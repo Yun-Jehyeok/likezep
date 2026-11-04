@@ -1,0 +1,63 @@
+name: Deploy Learn
+
+# apps/learn 또는 packages/** 변경 시 learn MF remote를 S3 /remotes/learn/ 에 배포.
+# remoteEntry.js는 no-cache, 나머지 Vite 해시 에셋은 immutable 1년 캐시.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'apps/learn/**'
+      - 'packages/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @mentoring/shared build
+
+      - run: pnpm --filter @mentoring/ui build
+
+      - name: Build learn
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: pnpm --filter learn build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Sync assets (immutable, 1y cache)
+        run: |
+          aws s3 sync apps/learn/dist/ s3://${{ secrets.S3_BUCKET }}/remotes/learn/ \
+            --delete \
+            --exclude "remoteEntry.js" \
+            --cache-control "public, max-age=31536000, immutable"
+
+      - name: Upload remoteEntry.js (no-cache)
+        run: |
+          aws s3 cp apps/learn/dist/remoteEntry.js \
+            s3://${{ secrets.S3_BUCKET }}/remotes/learn/remoteEntry.js \
+            --cache-control "no-cache" \
+            --content-type "application/javascript"
+
+      - name: Invalidate CloudFront (remoteEntry.js only)
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/remotes/learn/remoteEntry.js"
