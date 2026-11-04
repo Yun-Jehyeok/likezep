@@ -28,15 +28,15 @@ export function playChatNotification() {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
-    // 2음 벨: E5(659Hz) → G5(784Hz), 각 80ms
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(659, now);
-    osc.frequency.setValueAtTime(784, now + 0.08);
+    // 2음 벨: A5(880Hz) → D6(1174Hz), triangle 파형으로 더 선명하게
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(880, now);
+    osc.frequency.setValueAtTime(1174, now + 0.1);
 
-    // 짧은 어택 + 자연스러운 릴리스 (약 250ms)
+    // 볼륨 증가(0.18 → 0.4) + 릴리스 350ms
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.18, now + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+    gain.gain.linearRampToValueAtTime(0.4, now + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
 
     osc.connect(gain).connect(ctx.destination);
     osc.start(now);

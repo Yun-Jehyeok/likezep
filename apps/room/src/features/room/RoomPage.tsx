@@ -58,6 +58,17 @@ interface RemotePeer {
     name: string;
 }
 
+function formatMessageTime(ts: string | undefined): string {
+    if (!ts) return "";
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    const h = d.getHours();
+    const m = d.getMinutes();
+    const ampm = h < 12 ? "오전" : "오후";
+    const h12 = h % 12 || 12;
+    return `${ampm} ${h12}:${String(m).padStart(2, "0")}`;
+}
+
 export function RoomPage() {
     const { roomId } = useParams<{ roomId: string }>();
     const location = useLocation();
@@ -110,6 +121,9 @@ export function RoomPage() {
     const chatScrollRef = useRef<HTMLDivElement>(null);
     // prepend 직전 scrollHeight/scrollTop을 저장. 로드 후 scrollTop을 보정해 "보던 위치" 유지.
     const scrollRestoreRef = useRef<{ height: number; top: number } | null>(null);
+    const atBottomRef = useRef(true);
+    const chatInputRef = useRef<HTMLTextAreaElement>(null);
+    const [unreadCount, setUnreadCount] = useState(0);
     const [hasMoreHistory, setHasMoreHistory] = useState(true);
     const [loadingHistory, setLoadingHistory] = useState(false);
 
@@ -129,12 +143,31 @@ export function RoomPage() {
             scrollRestoreRef.current = null;
             return;
         }
-        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        if (atBottomRef.current) {
+            chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            setUnreadCount(0);
+        } else {
+            setUnreadCount((n) => n + 1);
+        }
     }, [messages]);
+
+    useLayoutEffect(() => {
+        if (chatOpen) {
+            chatEndRef.current?.scrollIntoView({ behavior: "instant" });
+            setUnreadCount(0);
+            atBottomRef.current = true;
+        }
+    }, [chatOpen]);
 
     async function handleChatScroll() {
         const el = chatScrollRef.current;
-        if (!el || loadingHistory || !hasMoreHistory || !roomId) return;
+        if (!el) return;
+
+        const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+        atBottomRef.current = isAtBottom;
+        if (isAtBottom) setUnreadCount(0);
+
+        if (loadingHistory || !hasMoreHistory || !roomId) return;
         if (el.scrollTop > 80) return;
         const firstId = messages[0]?.id;
         if (!firstId) return;
@@ -168,6 +201,14 @@ export function RoomPage() {
         enumerate();
         navigator.mediaDevices?.addEventListener("devicechange", enumerate);
         return () => navigator.mediaDevices?.removeEventListener("devicechange", enumerate);
+    }, []);
+
+    useEffect(() => {
+        const handleVisibility = () => {
+            if (document.hidden) roomSendRef.current("timer-pause", {});
+        };
+        document.addEventListener("visibilitychange", handleVisibility);
+        return () => document.removeEventListener("visibilitychange", handleVisibility);
     }, []);
 
     useEffect(() => {
@@ -319,7 +360,8 @@ export function RoomPage() {
                 // Listen to chat messages
                 room.onMessage<ChatMessage>("chat", (msg) => {
                     if (cancelled) return;
-                    setMessages((prev) => [...prev, msg]);
+                    const msgWithTime = { ...msg, createdAt: msg.createdAt ?? new Date().toISOString() };
+                    setMessages((prev) => [...prev, msgWithTime]);
                     if (notifSoundOnRef.current && msg.userId !== user?.id) {
                         playChatNotification();
                     }
@@ -390,6 +432,7 @@ export function RoomPage() {
         if (!text) return;
         roomSendRef.current("chat", { text });
         setChatInput("");
+        if (chatInputRef.current) chatInputRef.current.style.height = "auto";
     }
 
     async function toggleMic() {
@@ -587,13 +630,13 @@ export function RoomPage() {
                             mySessionId={mySessionId}
                             onStart={() => roomSendRef.current("timer-start", {})}
                             onPause={() => roomSendRef.current("timer-pause", {})}
-                            onStop={() => roomSendRef.current("timer-stop", {})}
                         />
                         <div className="h-11 flex items-center px-4 border-b border-[#e4e4e4]">
                             <span className="text-sm font-semibold text-[#17171b]">채팅</span>
                         </div>
 
-                        <div ref={chatScrollRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+                        <div className="flex-1 relative overflow-hidden">
+                        <div ref={chatScrollRef} onScroll={handleChatScroll} className="h-full overflow-y-auto p-3 flex flex-col gap-2">
                             {loadingHistory && <p className="text-[#b2b2b2] text-xs text-center py-2">이전 메시지 불러오는 중...</p>}
                             {messages.length === 0 ? (
                                 <p className="text-[#b2b2b2] text-xs text-center py-6">아직 메시지가 없어요</p>
@@ -601,15 +644,19 @@ export function RoomPage() {
                                 messages.map((msg, i) => {
                                     const isMe = msg.userId === user?.id;
                                     const text = msg.text ?? msg.content ?? "";
+                                    const timeStr = formatMessageTime(msg.createdAt ?? msg.timestamp);
                                     return (
                                         <div key={msg.id ?? i} className={`flex flex-col gap-0.5 ${isMe ? "items-end" : "items-start"}`}>
                                             {!isMe && <span className="text-[11px] text-[#767676] px-1">{msg.name}</span>}
-                                            <div
-                                                className={`max-w-[200px] px-3 py-2 rounded-2xl text-sm break-words ${
-                                                    isMe ? "bg-[#0071ff] text-white rounded-tr-sm" : "bg-[#f4f6f9] text-[#17171b] rounded-tl-sm"
-                                                }`}
-                                            >
-                                                {text}
+                                            <div className={`flex items-end gap-1 ${isMe ? "flex-row-reverse" : "flex-row"}`}>
+                                                <div
+                                                    className={`max-w-[180px] px-3 py-2 rounded-2xl text-sm break-words whitespace-pre-wrap ${
+                                                        isMe ? "bg-[#0071ff] text-white rounded-tr-sm" : "bg-[#f4f6f9] text-[#17171b] rounded-tl-sm"
+                                                    }`}
+                                                >
+                                                    {text}
+                                                </div>
+                                                {timeStr && <span className="text-[10px] text-[#b2b2b2] shrink-0 pb-1">{timeStr}</span>}
                                             </div>
                                         </div>
                                     );
@@ -617,13 +664,33 @@ export function RoomPage() {
                             )}
                             <div ref={chatEndRef} />
                         </div>
+                        {unreadCount > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+                                    setUnreadCount(0);
+                                    atBottomRef.current = true;
+                                }}
+                                className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-[#0071ff] text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-md hover:bg-[#0064e6] transition-colors cursor-pointer whitespace-nowrap"
+                            >
+                                새 메시지 {unreadCount}개 ↓
+                            </button>
+                        )}
+                        </div>
 
                         <div className="p-3 border-t border-[#e4e4e4]">
-                            <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-[#e4e4e4] focus-within:border-[#0071ff] transition-colors bg-white">
-                                <input
-                                    type="text"
+                            <div className="flex items-end gap-2 px-3 py-2 rounded-xl border border-[#e4e4e4] focus-within:border-[#0071ff] transition-colors bg-white">
+                                <textarea
+                                    ref={chatInputRef}
+                                    rows={1}
                                     value={chatInput}
                                     onChange={(e) => setChatInput(e.target.value)}
+                                    onInput={(e) => {
+                                        const el = e.currentTarget;
+                                        el.style.height = "auto";
+                                        el.style.height = `${el.scrollHeight}px`;
+                                    }}
                                     onFocus={handleChatFocus}
                                     onBlur={handleChatBlur}
                                     onKeyDown={(e) => {
@@ -634,7 +701,7 @@ export function RoomPage() {
                                         }
                                     }}
                                     placeholder="메시지 입력..."
-                                    className="flex-1 text-sm text-[#17171b] placeholder:text-[#b2b2b2] outline-none bg-transparent"
+                                    className="flex-1 text-sm text-[#17171b] placeholder:text-[#b2b2b2] outline-none bg-transparent resize-none leading-5 max-h-[7.5rem] overflow-y-auto"
                                 />
                                 <button
                                     type="button"

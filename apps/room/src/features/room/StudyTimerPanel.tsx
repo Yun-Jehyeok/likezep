@@ -17,7 +17,6 @@ interface Props {
   mySessionId: string | null;
   onStart: () => void;
   onPause: () => void;
-  onStop: () => void;
 }
 
 function formatHMS(totalSec: number): string {
@@ -35,9 +34,11 @@ function currentSeconds(t: PlayerTimer): number {
   return t.acc;
 }
 
-export function StudyTimerPanel({ timers, mySessionId, onStart, onPause, onStop }: Props) {
+export function StudyTimerPanel({ timers, mySessionId, onStart, onPause }: Props) {
   // 매초 리렌더: running 타이머의 live 표시를 위해.
   const [, forceTick] = useState(0);
+  const [open, setOpen] = useState(true);
+
   useEffect(() => {
     const id = setInterval(() => forceTick((v) => v + 1), 1000);
     return () => clearInterval(id);
@@ -56,60 +57,69 @@ export function StudyTimerPanel({ timers, mySessionId, onStart, onPause, onStop 
   const myTimer = mySessionId ? timers[mySessionId] : undefined;
 
   return (
-    <div className="border-b border-[#e4e4e4] p-3">
-      <div className="flex items-center justify-between mb-2">
+    <div className="border-b border-[#e4e4e4]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-3 py-2.5 cursor-pointer hover:bg-[#f9f9f9] transition-colors"
+      >
         <span className="text-sm font-semibold text-[#17171b]">공부시간</span>
-        <span className="text-[10px] text-[#b2b2b2]">매일 자정(KST) 초기화</span>
-      </div>
-      <ul className="space-y-1 max-h-40 overflow-y-auto">
-        {entries.length === 0 ? (
-          <li className="text-[#b2b2b2] text-xs text-center py-2">참여자가 없어요</li>
-        ) : (
-          entries.map(([sid, t]) => {
-            const isMe = sid === mySessionId;
-            const dot = t.status === "running" ? "bg-[#22c55e]" : t.status === "paused" ? "bg-[#f59e0b]" : "bg-[#d4d4d4]";
-            return (
-              <li
-                key={sid}
-                className={`flex items-center justify-between gap-2 text-xs px-1.5 py-1 rounded-md ${isMe ? "bg-[#f4f6f9] font-medium text-[#17171b]" : "text-[#5a5a5a]"}`}
-              >
-                <div className="flex items-center gap-1.5 truncate min-w-0">
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
-                  <span className="truncate">{t.name}{isMe && " (나)"}</span>
-                </div>
-                <span className="tabular-nums shrink-0">{formatHMS(currentSeconds(t))}</span>
-              </li>
-            );
-          })
-        )}
-      </ul>
-      {myTimer && (
-        <div className="flex gap-1.5 mt-2.5">
-          {myTimer.status !== "running" ? (
-            <button
-              type="button"
-              onClick={onStart}
-              className="flex-1 h-7 bg-[#0071ff] hover:bg-[#0064e6] text-white rounded-lg text-xs font-medium transition-colors cursor-pointer"
-            >
-              {myTimer.status === "paused" ? "재개" : "시작"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onPause}
-              className="flex-1 h-7 bg-[#fef3c7] hover:bg-[#fde68a] text-[#92400e] rounded-lg text-xs font-medium transition-colors cursor-pointer"
-            >
-              일시정지
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onStop}
-            disabled={myTimer.status === "stopped" && myTimer.acc === 0}
-            className="flex-1 h-7 bg-[#fff1f0] hover:bg-[#ffe3e2] disabled:bg-[#f4f6f9] disabled:text-[#b2b2b2] disabled:cursor-not-allowed text-[#e03131] rounded-lg text-xs font-medium transition-colors cursor-pointer"
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-[#b2b2b2]">매일 자정(KST) 초기화</span>
+          <svg
+            className={`w-3.5 h-3.5 text-[#b2b2b2] transition-transform duration-200 ${open ? "" : "-rotate-90"}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
           >
-            정지
-          </button>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+
+      {open && (
+        <div className="px-3 pb-3">
+          <ul className="space-y-1 max-h-40 overflow-y-auto">
+            {entries.length === 0 ? (
+              <li className="text-[#b2b2b2] text-xs text-center py-2">참여자가 없어요</li>
+            ) : (
+              entries.map(([sid, t]) => {
+                const isMe = sid === mySessionId;
+                const dot = t.status === "running" ? "bg-[#22c55e]" : t.status === "paused" ? "bg-[#f59e0b]" : "bg-[#d4d4d4]";
+                return (
+                  <li
+                    key={sid}
+                    className={`flex items-center justify-between gap-2 text-xs px-1.5 py-1 rounded-md ${isMe ? "bg-[#f4f6f9] font-medium text-[#17171b]" : "text-[#5a5a5a]"}`}
+                  >
+                    <div className="flex items-center gap-1.5 truncate min-w-0">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
+                      <span className="truncate">{t.name}{isMe && " (나)"}</span>
+                    </div>
+                    <span className="tabular-nums shrink-0">{formatHMS(currentSeconds(t))}</span>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+          {myTimer && (
+            <div className="flex gap-1.5 mt-2.5">
+              {myTimer.status !== "running" ? (
+                <button
+                  type="button"
+                  onClick={onStart}
+                  className="flex-1 h-7 bg-[#0071ff] hover:bg-[#0064e6] text-white rounded-lg text-xs font-medium transition-colors cursor-pointer"
+                >
+                  {myTimer.status === "paused" ? "재개" : "시작"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onPause}
+                  className="flex-1 h-7 bg-[#fef3c7] hover:bg-[#fde68a] text-[#92400e] rounded-lg text-xs font-medium transition-colors cursor-pointer"
+                >
+                  일시정지
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
