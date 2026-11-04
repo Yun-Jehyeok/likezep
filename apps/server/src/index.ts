@@ -24,6 +24,8 @@ import { authRouter } from "./api/auth.js";
 import { roomsRouter } from "./api/rooms.js";
 import { adminRouter } from "./api/admin.js";
 import { internalRouter } from "./api/internal.js";
+import { coursesRouter } from "./api/routes/courses.js";
+import { adminCoursesRouter } from "./api/routes/adminCourses.js";
 import { config } from "./config.js";
 
 // Sentry 초기화 — DSN이 없으면 비활성화 (로컬 개발 환경에서 에러 전송 안 함)
@@ -63,7 +65,9 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 // REST API 라우터 마운트
 app.use("/api/auth", authRouter);    // 로그인, 유저 정보
 app.use("/api/rooms", roomsRouter);  // 룸 목록, 채팅 히스토리
-app.use("/api/admin", adminRouter);  // 관리자 전용 (그룹 관리, 통계)
+app.use("/api/admin", adminRouter);                     // 관리자 전용 (그룹 관리, 통계)
+app.use("/api/admin/courses", adminCoursesRouter);      // 관리자 강의 CRUD
+app.use("/api/courses", coursesRouter);                 // 강의 목록/상세/진행률
 app.use("/api/internal", internalRouter);  // 서버 내부용 (WebRTC 통계 수집)
 app.use("/ms", mediasoupRouter);     // mediasoup SFU (화면공유 transport/produce/consume)
 

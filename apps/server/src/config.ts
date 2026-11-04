@@ -23,6 +23,13 @@ const schema = z.object({
   // 콤마 구분 허용 origin 목록. "*"이면 전체 허용 (현행 동작 유지).
   // 프로덕션 예: "https://like-zep.shop,https://www.like-zep.shop"
   CORS_ORIGINS: z.string().default("*"),
+  // 강의 영상/자료 S3 버킷. 기본값은 개발/스테이징 버킷명.
+  S3_VIDEOS_BUCKET: z.string().default("likezep-videos-prod"),
+  // 영상 버킷 리전
+  AWS_VIDEOS_REGION: z.string().default("ap-northeast-2"),
+  // 영상 버킷에 CloudFront CDN이 붙어있으면 해당 base URL (썸네일 정적 URL에 사용).
+  // 미설정이면 썸네일도 presigned URL로 fallback.
+  VIDEOS_CDN_URL: z.string().optional(),
 });
 
 export const config = schema.parse(process.env);

@@ -16,8 +16,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      # typecheck는 shared의 .d.ts와 prisma client의 생성된 타입을 요구
+      # typecheck는 shared/ui의 .d.ts와 prisma client의 생성된 타입을 요구
       - run: pnpm --filter @mentoring/shared build
+      - run: pnpm --filter @mentoring/ui build
       - run: pnpm --filter @mentoring/server exec prisma generate
       - run: pnpm check
 
