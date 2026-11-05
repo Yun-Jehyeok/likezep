@@ -204,14 +204,6 @@ export function RoomPage() {
     }, []);
 
     useEffect(() => {
-        const handleVisibility = () => {
-            if (document.hidden) roomSendRef.current("timer-pause", {});
-        };
-        document.addEventListener("visibilitychange", handleVisibility);
-        return () => document.removeEventListener("visibilitychange", handleVisibility);
-    }, []);
-
-    useEffect(() => {
         if (!roomId || !token || !user || !canvasRef.current) return;
 
         setOccupants(0);
