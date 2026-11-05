@@ -17,7 +17,7 @@
  * - PixiJS Application.init()이 비동기이므로 constructor 대신 static 팩토리 메서드를 사용
  * - constructor를 직접 호출하면 await app.init()을 쓸 수 없다
  */
-import { Application, Container } from "pixi.js";
+import { Application, Container, Assets, type Texture } from "pixi.js";
 import type { Room } from "colyseus.js";
 import type { PlayerInfo } from "../core/realtime/colyseusClient.js";
 import { Avatar } from "./entities/Avatar.js";
@@ -69,7 +69,8 @@ export class GameApp {
     self.viewport = viewport;
     app.stage.addChild(viewport);
 
-    viewport.addChild(new MapRenderer());
+    const tileset = await Assets.load<Texture>("/assets/roguelikeIndoor.png");
+    viewport.addChild(new MapRenderer(tileset));
 
     self.keyboard = new KeyboardInput();
 
