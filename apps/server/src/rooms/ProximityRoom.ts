@@ -232,9 +232,9 @@ export class ProximityRoom extends Room<ProximityRoomState> {
     const player = new Player();
     player.id = client.sessionId;
     player.name = displayName;
-    // 맵 중앙(400, 300) 근처 랜덤 위치에서 스폰 (겹침 방지)
-    player.x = 400 + (Math.random() * 100 - 50);
-    player.y = 300 + (Math.random() * 100 - 50);
+    // 중앙 광장 위쪽 입구 앞 (x≈800, y≈350) 근처 랜덤 스폰
+    player.x = 780 + (Math.random() * 80 - 40);
+    player.y = 340 + (Math.random() * 60 - 30);
     // 입장 시 서버 메모리의 현재 타이머 상태(자정 리셋 포함)를 초기값으로 반영.
     if (auth?.userId) {
       const t = getTimer(auth.userId);
