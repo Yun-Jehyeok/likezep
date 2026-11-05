@@ -21,7 +21,7 @@ import { Application, Container } from "pixi.js";
 import type { Room } from "colyseus.js";
 import type { PlayerInfo } from "../core/realtime/colyseusClient.js";
 import { Avatar } from "./entities/Avatar.js";
-import { MapRenderer, MAP_WIDTH, MAP_HEIGHT } from "./world/mapRenderer.js";
+import { MapRenderer, MAP_WIDTH, MAP_HEIGHT, WALL_RECTS } from "./world/mapRenderer.js";
 import { KeyboardInput } from "./input/keyboard.js";
 
 const MOVE_SPEED = 220;      // 초당 픽셀 이동 속도
@@ -130,8 +130,7 @@ export class GameApp {
 
   /**
    * 키보드 입력에 따라 내 아바타를 이동.
-   * dt(deltaTime)를 곱해 60fps/30fps 관계없이 같은 속도로 이동하게 한다.
-   * Math.max/min으로 맵 경계를 벗어나지 않게 클램핑.
+   * X/Y 축을 분리해 충돌 판정 → 벽에 걸려도 평행 방향으로 미끄러질 수 있다.
    */
   private moveLocal(dt: number) {
     const me = this.avatars.get(this.mySessionId);
@@ -140,12 +139,19 @@ export class GameApp {
     const step = MOVE_SPEED * dt;
     const kb = this.keyboard;
 
-    if (kb.isDown("w") || kb.isDown("arrowup"))    me.y = Math.max(PLAYER_RADIUS, me.y - step);
-    if (kb.isDown("s") || kb.isDown("arrowdown"))  me.y = Math.min(MAP_HEIGHT - PLAYER_RADIUS, me.y + step);
-    if (kb.isDown("a") || kb.isDown("arrowleft"))  me.x = Math.max(PLAYER_RADIUS, me.x - step);
-    if (kb.isDown("d") || kb.isDown("arrowright")) me.x = Math.min(MAP_WIDTH - PLAYER_RADIUS, me.x + step);
+    let nx = me.x;
+    let ny = me.y;
 
-    // 내 아바타는 로컬에서 직접 이동하므로 targetX/Y를 현재값과 동기화해 보간이 작동하지 않게 한다
+    if (kb.isDown("w") || kb.isDown("arrowup"))    ny = Math.max(PLAYER_RADIUS, me.y - step);
+    if (kb.isDown("s") || kb.isDown("arrowdown"))  ny = Math.min(MAP_HEIGHT - PLAYER_RADIUS, me.y + step);
+    if (kb.isDown("a") || kb.isDown("arrowleft"))  nx = Math.max(PLAYER_RADIUS, me.x - step);
+    if (kb.isDown("d") || kb.isDown("arrowright")) nx = Math.min(MAP_WIDTH - PLAYER_RADIUS, me.x + step);
+
+    // X축 이동: 충돌 없으면 적용
+    if (nx !== me.x && !collidesWall(nx, me.y)) me.x = nx;
+    // Y축 이동: 충돌 없으면 적용
+    if (ny !== me.y && !collidesWall(me.x, ny)) me.y = ny;
+
     me.targetX = me.x;
     me.targetY = me.y;
   }
@@ -198,4 +204,20 @@ export class GameApp {
     this.keyboard.destroy();
     this.app.destroy(false, { children: true });  // canvas DOM은 React가 관리하므로 제거하지 않음
   }
+}
+
+/**
+ * 플레이어 원이 임의의 벽 사각형과 충돌하는지 검사한다.
+ * 원-AABB 최근접점 거리 비교: 각 축에서 클램핑한 뒤 거리의 제곱을 비교한다.
+ */
+function collidesWall(px: number, py: number): boolean {
+  const r = PLAYER_RADIUS;
+  for (const w of WALL_RECTS) {
+    const nearX = Math.max(w.x, Math.min(px, w.x + w.w));
+    const nearY = Math.max(w.y, Math.min(py, w.y + w.h));
+    const dx = px - nearX;
+    const dy = py - nearY;
+    if (dx * dx + dy * dy < r * r) return true;
+  }
+  return false;
 }
