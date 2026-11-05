@@ -392,6 +392,7 @@ export function RoomPage() {
                 ensureLocalStream().catch(() => {});
             })
             .catch((err: Error) => {
+                console.error("[joinRoom] failed:", err);
                 if (!cancelled) setConnError(err?.message ?? "룸 연결에 실패했습니다.");
             });
 
@@ -537,7 +538,7 @@ export function RoomPage() {
                     </div>
                     <h2 className="text-lg font-bold text-[#17171b] mb-2">{isAccessDenied ? "접근 권한 없음" : "연결 실패"}</h2>
                     <p className="text-sm text-[#767676] mb-6 leading-relaxed">
-                        {isAccessDenied ? "소속 그룹의 룸과 공용 공간에만 입장할 수 있어요." : "룸 연결에 실패했습니다. 잠시 후 다시 시도해 주세요."}
+                        {isAccessDenied ? "소속 그룹의 룸과 공용 공간에만 입장할 수 있어요." : (connError || "룸 연결에 실패했습니다. 잠시 후 다시 시도해 주세요.")}
                     </p>
                     <button type="button" onClick={() => navigate("/lobby")} className="w-full h-11 bg-[#0071ff] hover:bg-[#0064e6] text-white text-sm font-semibold rounded-xl transition-colors">
                         확인

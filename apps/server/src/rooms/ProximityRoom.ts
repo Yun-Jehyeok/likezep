@@ -197,26 +197,31 @@ export class ProximityRoom extends Room<ProximityRoomState> {
    * 예외를 throw하면 접속이 거부된다.
    */
   async onAuth(_client: Client, options: { token?: string; dbRoomId?: string }) {
-    const { token, dbRoomId } = options;
-    if (!token) throw new Error("Token required");
+    try {
+      const { token, dbRoomId } = options;
+      if (!token) throw new Error("Token required");
 
-    // JWT 서명 검증 — 위조된 토큰은 여기서 예외 발생
-    const payload = jwt.verify(token, config.JWT_SECRET) as AuthPayload;
+      // JWT 서명 검증 — 위조된 토큰은 여기서 예외 발생
+      const payload = jwt.verify(token, config.JWT_SECRET) as AuthPayload;
 
-    if (dbRoomId) {
-      // DB의 최신 groupId 기준으로 체크 (JWT는 배정 후 갱신 안 됨)
-      const [room, user] = await Promise.all([
-        findRoomById(dbRoomId),
-        findUserById(payload.userId),
-      ]);
-      if (!room) throw new Error("Room not found");
-      // private 룸은 같은 그룹의 멘티만 입장 가능
-      if (room.type === "private" && user?.role === "mentee" && user.groupId !== room.groupId) {
-        throw new Error("Access denied");
+      if (dbRoomId) {
+        // DB의 최신 groupId 기준으로 체크 (JWT는 배정 후 갱신 안 됨)
+        const [room, user] = await Promise.all([
+          findRoomById(dbRoomId),
+          findUserById(payload.userId),
+        ]);
+        if (!room) throw new Error("Room not found");
+        // private 룸은 같은 그룹의 멘티만 입장 가능
+        if (room.type === "private" && user?.role === "mentee" && user.groupId !== room.groupId) {
+          throw new Error("Access denied");
+        }
       }
-    }
 
-    return payload;
+      return payload;
+    } catch (err) {
+      console.error("[onAuth] error:", err);
+      throw err;
+    }
   }
 
   /**
