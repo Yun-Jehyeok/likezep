@@ -79,12 +79,12 @@ export class GameApp {
     self.tickBound = self.tick.bind(self);
     app.ticker.add(self.tickBound);
 
-    // 내 아바타는 입장 시 맵 중앙에 배치 (서버의 랜덤 스폰 위치는 state sync로 곧 덮임)
+    // 광장 상단 입구 쪽에 배치 — 중앙은 분수 충돌 rect와 겹침
     self.addPlayer(sessionId, {
       id: sessionId,
       name: playerName,
       x: MAP_WIDTH / 2,
-      y: MAP_HEIGHT / 2,
+      y: 480,
       timerStatus: "stopped",
       timerAccumulatedSec: 0,
       timerStartedAt: 0,
