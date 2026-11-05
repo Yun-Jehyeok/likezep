@@ -1,84 +1,59 @@
 /**
  * 2D 맵 렌더러 — 구역별 벽, 출입구, 인테리어를 PixiJS로 그린다
  *
- * 구조:
- * - WALL_RECTS: 충돌 판정에 사용하는 벽 세그먼트 배열 (GameApp에서 import)
- * - MapRenderer: PixiJS Container 서브클래스. 배경→바닥→인테리어→벽 순으로 그린다.
- *   인테리어는 Graphics(기하 도형) + Sprite(타일셋 이미지) 혼합 방식.
+ * 구역 배치 (1600×1200 맵):
+ *   휴식 공간 (20,20,480,380)   — 오른쪽 출입구
+ *   스터디룸  (1100,20,480,380) — 왼쪽 출입구
+ *   중앙 광장 (580,440,440,320) — 사방 출입구
+ *   자료실    (20,800,480,380)  — 오른쪽 출입구
+ *   상담실    (1100,800,480,380)— 왼쪽 출입구
  *
- * 타일셋: roguelikeIndoor_transparent.png (Kenney, CC0)
- *   - 타일 크기: 16×16 px, 1px 간격 → step = 17px
- *   - 그리드: 27 cols × 18 rows
- *
- * 구역 배치:
- *   중앙 광장 (center) — 사방 출입구
- *   휴식 공간 (top-left)  — 오른쪽 벽 출입구
- *   스터디룸  (top-right)  — 왼쪽 벽 출입구
- *   자료실    (bot-left)   — 오른쪽 벽 출입구
- *   상담실    (bot-right)  — 왼쪽 벽 출입구
+ * 타일셋: roguelikeIndoor (Kenney, CC0) — 16×16 px, 1px 간격(step=17px)
+ * WALL_RECTS: 벽 세그먼트 + 가구 충돌 rect 합산 (GameApp collidesWall에서 사용)
  */
 import { Container, Graphics, Text, Sprite, Texture, Rectangle } from "pixi.js";
 
 export const MAP_WIDTH  = 1600;
 export const MAP_HEIGHT = 1200;
 
-const WALL_T = 14;  // 벽 두께 (px)
-const ENTRY_W = 72; // 출입구 너비 (px)
+const WALL_T  = 14;
+const ENTRY_W = 90;
+const TS      = 48; // 타일 1개 화면 크기 (16px × scale 3)
 
 export interface WallRect { x: number; y: number; w: number; h: number; }
 
-// ── 구역 위치/색상 정의 ──────────────────────────────────────────────────────
-const PLAZA   = { x: 580,  y: 430, w: 440, h: 340, color: 0x0071ff, label: "중앙 광장" };
-const REST    = { x:  40,  y:  40, w: 300, h: 240, color: 0x22c55e, label: "휴식 공간" };
-const STUDY   = { x: 1260, y:  40, w: 300, h: 240, color: 0xa855f7, label: "스터디룸"  };
-const LIBRARY = { x:  40,  y: 920, w: 300, h: 240, color: 0xeab308, label: "자료실"    };
-const COUNSEL = { x: 1260, y: 920, w: 300, h: 240, color: 0xec4899, label: "상담실"    };
+// ── 구역 정의 ──────────────────────────────────────────────────────────────────
+const PLAZA   = { x: 580,  y: 440, w: 440, h: 320, color: 0x0071ff, label: "중앙 광장" };
+const REST    = { x:  20,  y:  20, w: 480, h: 380, color: 0x22c55e, label: "휴식 공간" };
+const STUDY   = { x: 1100, y:  20, w: 480, h: 380, color: 0xa855f7, label: "스터디룸"  };
+const LIBRARY = { x:  20,  y: 800, w: 480, h: 380, color: 0xeab308, label: "자료실"    };
+const COUNSEL = { x: 1100, y: 800, w: 480, h: 380, color: 0xec4899, label: "상담실"    };
 
 type ZoneDef = typeof PLAZA;
 
-// ── 타일셋 좌표 (col, row) — 0-indexed ──────────────────────────────────────
-// roguelikeIndoor 27×18 그리드 기준. 필요 시 조정.
+// ── 타일셋 좌표 (col, row) — roguelikeIndoor 27×18 그리드 ─────────────────────
 const T = {
-  // ── 의자 (단일 타일, 갈색 목재) ──
-  chairS: [0,  0],  // 아래 방향
-  chairN: [1,  0],  // 위 방향
-  chairW: [2,  0],  // 왼쪽 방향
-  chairE: [3,  0],  // 오른쪽 방향
-
-  // ── 테이블/책상 (2타일 가로) ──
-  tableL: [4,  0],
-  tableR: [5,  0],
-
-  // ── 소파 (3타일 가로) ──
-  sofaL:  [0,  4],
-  sofaM:  [1,  4],
-  sofaR:  [2,  4],
-
-  // ── 러그 (3×2 타일) ──
-  rugTL:  [0,  6],  rugTM:  [1,  6],  rugTR:  [2,  6],
-  rugBL:  [0,  7],  rugBM:  [1,  7],  rugBR:  [2,  7],
-
-  // ── 책장 (1타일 × 2타일 높이) ──
-  shelfT: [0,  9],
-  shelfB: [0, 10],
-
-  // ── 녹색 큰 책장 (2타일 가로) ──
+  chairS:    [0,  0],
+  chairN:    [1,  0],
+  chairW:    [2,  0],
+  chairE:    [3,  0],
+  tableL:    [4,  0],
+  tableR:    [5,  0],
+  sofaL:     [0,  4],
+  sofaM:     [1,  4],
+  sofaR:     [2,  4],
+  rugTL:     [0,  6],  rugTM:     [1,  6],  rugTR:     [2,  6],
+  rugBL:     [0,  7],  rugBM:     [1,  7],  rugBR:     [2,  7],
+  shelfT:    [0,  9],
+  shelfB:    [0, 10],
   bigShelfL: [3,  9],
   bigShelfR: [4,  9],
-
-  // ── 화분/식물 ──
-  plantLg: [24, 0],
-  plantSm: [25, 0],
-
-  // ── 나무 (실외) ──
-  treeT:   [22, 0],
-  treeB:   [22, 1],
-
-  // ── 가로등/조명 ──
-  lamp:    [26, 0],
+  plantLg:   [24, 0],
+  plantSm:   [25, 0],
+  lamp:      [26, 0],
 } as const;
 
-// ── 벽 세그먼트 생성 ─────────────────────────────────────────────────────────
+// ── 벽 세그먼트 생성 ──────────────────────────────────────────────────────────
 
 function wallSegments(
   side: "top" | "bottom" | "left" | "right",
@@ -146,9 +121,85 @@ function buildWalls(): WallRect[] {
   return w;
 }
 
-export const WALL_RECTS: WallRect[] = buildWalls();
+// ── 가구 충돌 rect — 렌더링 위치와 1:1 대응 ─────────────────────────────────
 
-// ── 렌더러 ───────────────────────────────────────────────────────────────────
+function buildFurnitureRects(): WallRect[] {
+  const r: WallRect[] = [];
+  const f = (x: number, y: number, w: number, h: number) => r.push({ x, y, w, h });
+
+  // ── PLAZA ──────────────────────────────────────────────────────────
+  const { x: px, y: py, w: pw, h: ph } = PLAZA;
+  const fcx = px + pw / 2, fcy = py + ph / 2;
+  f(fcx - 56, fcy - 56, 112, 112);            // 분수 (수원 차단)
+  f(fcx - 110, fcy - 24,  TS, TS);            // 벤치 왼쪽
+  f(fcx +  62, fcy - 24,  TS, TS);            // 벤치 오른쪽
+  f(fcx -  24, fcy - 94,  TS, TS);            // 벤치 위
+  f(fcx -  24, fcy +  46, TS, TS);            // 벤치 아래
+
+  // ── REST ───────────────────────────────────────────────────────────
+  const { x: rx, y: ry, w: rw, h: rh } = REST;
+  const rix = rx + WALL_T, riy = ry + WALL_T;
+  const riw = rw - WALL_T * 2, rih = rh - WALL_T * 2;
+  const rmy = riy + rih / 2;
+  f(rix + riw / 2 - TS * 1.5, riy + 16, TS * 3, TS);           // 소파
+  f(rix + riw / 2 - TS,       rmy - TS / 2,  TS * 2, TS);       // 커피 테이블
+  f(rix + 12,           rmy - TS / 2, TS, TS);                  // 안락의자 L
+  f(rix + riw - TS - 12, rmy - TS / 2, TS, TS);                 // 안락의자 R
+  f(rix + 8,       riy + 8,       TS, TS);                      // 화분 TL
+  f(rix + riw - TS - 8, riy + 8,  TS, TS);                      // 화분 TR
+  f(rix + 8,       riy + rih - TS - 8, TS, TS);                 // 화분 BL
+  f(rix + riw - TS - 8, riy + rih - TS - 8, TS, TS);            // 화분 BR
+
+  // ── STUDY ──────────────────────────────────────────────────────────
+  const { x: sx, y: sy, w: sw, h: sh } = STUDY;
+  const six = sx + WALL_T, siy = sy + WALL_T;
+  const siw = sw - WALL_T * 2, sih = sh - WALL_T * 2;
+  for (let bx = six + 4; bx + TS <= six + siw - 4; bx += TS + 4)
+    f(bx, siy + 4, TS, TS * 2);                                  // 책장
+  const sdCols = [six + 24, six + siw - TS * 2 - 24];
+  const sdRows = [siy + TS * 2 + 24, siy + TS * 3 + 40];
+  for (const dy of sdRows)
+    for (const dx of sdCols) {
+      f(dx, dy, TS * 2, TS);                                     // 책상
+      f(dx + 12, dy + TS + 4, TS, TS);                           // 의자
+    }
+  const stdx = six + siw / 2 - TS, stdy = siy + sih - TS - 8;
+  f(stdx, stdy, TS * 2, TS);                                     // 강사 책상
+
+  // ── LIBRARY ────────────────────────────────────────────────────────
+  const { x: lx, y: ly, w: lw, h: lh } = LIBRARY;
+  const lix = lx + WALL_T, liy = ly + WALL_T;
+  const liw = lw - WALL_T * 2, lih = lh - WALL_T * 2;
+  for (let bx = lix + 4; bx + TS <= lix + liw - 4; bx += TS + 4)
+    f(bx, liy + 4, TS, TS * 2);                                  // 상단 책장
+  for (let by = liy + TS * 2 + 20; by + TS * 2 <= liy + lih - 8; by += TS * 2 + 12)
+    f(lix + 4, by, TS * 2, TS * 2);                              // 왼쪽 대형 책장
+  const ltcx = lix + liw / 2 - TS * 2, ltcy = liy + lih / 2 - TS / 2;
+  f(ltcx, ltcy, TS * 4, TS);                                     // 열람 테이블
+  f(ltcx - TS - 4, ltcy, TS, TS);                                // 의자 L
+  f(ltcx + TS * 4 + 4, ltcy, TS, TS);                            // 의자 R
+  f(ltcx + TS,     ltcy - TS - 4, TS, TS);                       // 의자 위1
+  f(ltcx + TS * 2, ltcy - TS - 4, TS, TS);                       // 의자 위2
+  f(lix + liw - TS - 8, liy + lih - TS - 8, TS, TS);             // 조명
+
+  // ── COUNSEL ────────────────────────────────────────────────────────
+  const { x: cox, y: coy, w: cow, h: coh } = COUNSEL;
+  const ccix = cox + WALL_T, cciy = coy + WALL_T;
+  const cciw = cow - WALL_T * 2, ccih = coh - WALL_T * 2;
+  const ccmx = ccix + cciw / 2;
+  f(ccmx - TS * 1.5, cciy + 16, TS * 3, TS);                     // 소파
+  f(ccmx - TS, cciy + ccih / 2 - TS / 2, TS * 2, TS);            // 커피 테이블
+  f(ccix + 12,            cciy + ccih / 2 - TS / 2, TS, TS);     // 안락의자 L
+  f(ccix + cciw - TS - 12, cciy + ccih / 2 - TS / 2, TS, TS);    // 안락의자 R
+  f(ccix + 8,              cciy + ccih - TS - 8, TS, TS);         // 화분 BL
+  f(ccix + cciw - TS - 8,  cciy + ccih - TS - 8, TS, TS);         // 화분 BR
+
+  return r;
+}
+
+export const WALL_RECTS: WallRect[] = [...buildWalls(), ...buildFurnitureRects()];
+
+// ── 렌더러 ────────────────────────────────────────────────────────────────────
 
 export class MapRenderer extends Container {
   private ts: Texture | null;
@@ -170,9 +221,8 @@ export class MapRenderer extends Container {
     this.drawBoundary();
   }
 
-  // ── 타일셋 헬퍼 ─────────────────────────────────────────────────────────
+  // ── 타일셋 헬퍼 ───────────────────────────────────────────────────────────
 
-  /** 타일셋의 (col, row) 타일을 주어진 scale 배율로 반환 */
   private spr([col, row]: readonly [number, number], scale = 3): Sprite {
     if (this.ts) {
       const tex = new Texture({
@@ -186,7 +236,6 @@ export class MapRenderer extends Container {
     return new Sprite(Texture.EMPTY);
   }
 
-  /** 타일 스프라이트를 월드 좌표 (wx, wy)에 배치하고 씬에 추가 */
   private place(wx: number, wy: number, tile: readonly [number, number], scale = 3): Sprite {
     const s = this.spr(tile, scale);
     s.x = wx;
@@ -195,7 +244,7 @@ export class MapRenderer extends Container {
     return s;
   }
 
-  // ── 배경/공통 ────────────────────────────────────────────────────────────
+  // ── 배경/공통 ─────────────────────────────────────────────────────────────
 
   private drawBackground() {
     const g = new Graphics();
@@ -219,28 +268,38 @@ export class MapRenderer extends Container {
   }
 
   private drawOutdoor() {
-    const g = new Graphics();
-    const pathColor = 0x1a1a2e;
+    // 광장에서 사방으로 뻗는 십자형 통로
     const { x: px, y: py, w: pw, h: ph } = PLAZA;
-    g.rect(px + pw / 2 - 20, py - 160, 40, 160).fill({ color: pathColor });
-    g.rect(px + pw / 2 - 20, py + ph,  40, 160).fill({ color: pathColor });
-    g.rect(px - 160, py + ph / 2 - 20, 160, 40).fill({ color: pathColor });
-    g.rect(px + pw,  py + ph / 2 - 20, 160, 40).fill({ color: pathColor });
+    const pathColor = 0x1a1a2e;
+    const pathW = 64;
+    const pcx = px + pw / 2, pcy = py + ph / 2;
+    const g = new Graphics();
+    g.rect(pcx - pathW / 2, 0,       pathW, py);                   // 북
+    g.rect(pcx - pathW / 2, py + ph, pathW, MAP_HEIGHT - py - ph); // 남
+    g.rect(0,       pcy - pathW / 2, px,                   pathW); // 서
+    g.rect(px + pw, pcy - pathW / 2, MAP_WIDTH - px - pw,  pathW); // 동
+    g.fill({ color: pathColor });
     this.addChild(g);
 
-    // 실외 나무 (Graphics 원 — 타일셋 나무는 1×2타일이라 실외용으론 Graphics가 더 적합)
-    const treePositions = [
-      { x: 480, y: 180 }, { x: 320, y: 360 },
-      { x: 1120, y: 180 }, { x: 1280, y: 360 },
-      { x: 480, y: 820 }, { x: 320, y: 640 },
-      { x: 1120, y: 820 }, { x: 1280, y: 640 },
-      { x: 760, y: 160 }, { x: 840, y: 160 },
-      { x: 760, y: 1040 }, { x: 840, y: 1040 },
-      { x: 160, y: 580 }, { x: 160, y: 480 },
-      { x: 1440, y: 580 }, { x: 1440, y: 480 },
+    // 실외 나무 (Graphics 원)
+    const trees = [
+      // 광장 위쪽 (REST ~ STUDY 사이)
+      { x: 660, y: 100 }, { x: 760, y: 55 }, { x: 850, y: 55 }, { x: 940, y: 100 },
+      { x: 710, y: 240 }, { x: 890, y: 240 },
+      // 광장 아래쪽 (LIBRARY ~ COUNSEL 사이)
+      { x: 660, y: 1100 }, { x: 760, y: 1145 }, { x: 850, y: 1145 }, { x: 940, y: 1100 },
+      { x: 710, y: 960  }, { x: 890, y: 960  },
+      // 왼쪽 (REST 아래 ~ LIBRARY 위)
+      { x: 100, y: 480 }, { x: 220, y: 560 }, { x: 100, y: 660 }, { x: 350, y: 500 },
+      { x: 420, y: 680 }, { x: 240, y: 720 },
+      // 오른쪽 (STUDY 아래 ~ COUNSEL 위)
+      { x: 1500, y: 480 }, { x: 1380, y: 560 }, { x: 1500, y: 660 }, { x: 1250, y: 500 },
+      { x: 1180, y: 680 }, { x: 1360, y: 720 },
+      // 외곽 모서리
+      { x: 540, y: 120 }, { x: 1060, y: 120 }, { x: 540, y: 880 }, { x: 1060, y: 880 },
     ];
     const tg = new Graphics();
-    for (const t of treePositions) {
+    for (const t of trees) {
       tg.circle(t.x, t.y, 22).fill({ color: 0x14532d, alpha: 0.75 });
       tg.circle(t.x, t.y, 15).fill({ color: 0x166534, alpha: 0.9 });
       tg.circle(t.x, t.y,  8).fill({ color: 0x15803d });
@@ -266,195 +325,194 @@ export class MapRenderer extends Container {
 
   // ── 구역별 인테리어 ──────────────────────────────────────────────────────
 
-  /** 중앙 광장 — 분수, 벤치, 가로등 */
+  /** 중앙 광장 — 분수, 사방 벤치, 모서리 가로등 */
   private plazaDecorations({ x, y, w, h, color }: ZoneDef) {
     const cx = x + w / 2, cy = y + h / 2;
     const g = new Graphics();
 
-    g.rect(cx - 90, cy - 70, 180, 140).fill({ color, alpha: 0.07 });
-
     // 분수
-    g.circle(cx, cy, 52).fill({ color: 0x071628 });
-    g.circle(cx, cy, 52).stroke({ color, alpha: 0.45, width: 3 });
-    g.circle(cx, cy, 34).fill({ color: 0x0d1f3c });
-    g.circle(cx, cy, 34).stroke({ color, alpha: 0.5, width: 2 });
-    g.circle(cx, cy, 11).fill({ color, alpha: 0.75 });
-    g.circle(cx, cy,  6).fill({ color: 0xffffff, alpha: 0.65 });
+    g.circle(cx, cy, 56).fill({ color: 0x071628 });
+    g.circle(cx, cy, 56).stroke({ color, alpha: 0.45, width: 3 });
+    g.circle(cx, cy, 36).fill({ color: 0x0d1f3c });
+    g.circle(cx, cy, 36).stroke({ color, alpha: 0.5, width: 2 });
+    g.circle(cx, cy, 12).fill({ color, alpha: 0.75 });
+    g.circle(cx, cy,  7).fill({ color: 0xffffff, alpha: 0.65 });
 
     const ix = x + WALL_T + 10, iy = y + WALL_T + 10;
     g.rect(ix, iy, w - WALL_T * 2 - 20, h - WALL_T * 2 - 20)
       .stroke({ color, alpha: 0.1, width: 1 });
     this.addChild(g);
 
-    // 벤치 — 타일셋 의자 스프라이트 (분수 사방)
-    const S = 3;  // scale
-    const TS = 16 * S;  // 타일 1개의 화면 크기 (48px)
-    this.place(cx - 108,       cy - TS / 2, T.chairE, S);
-    this.place(cx +  64,       cy - TS / 2, T.chairW, S);
-    this.place(cx - TS / 2,    cy - 92,     T.chairS, S);
-    this.place(cx - TS / 2,    cy +  44,    T.chairN, S);
+    // 벤치 (분수 사방)
+    this.place(cx - 110, cy - 24,  T.chairE);
+    this.place(cx +  62, cy - 24,  T.chairW);
+    this.place(cx -  24, cy - 94,  T.chairS);
+    this.place(cx -  24, cy +  46, T.chairN);
 
-    // 모서리 가로등 — 조명 타일
-    const corners: Array<[number, number]> = [
-      [x + WALL_T + 4,     y + WALL_T + 4    ],
-      [x + w - WALL_T - 4 - TS, y + WALL_T + 4    ],
-      [x + WALL_T + 4,     y + h - WALL_T - 4 - TS],
+    // 모서리 가로등
+    const ix2 = x + WALL_T + 4, iy2 = y + WALL_T + 4;
+    for (const [lx, ly] of [
+      [ix2, iy2],
+      [x + w - WALL_T - 4 - TS, iy2],
+      [ix2, y + h - WALL_T - 4 - TS],
       [x + w - WALL_T - 4 - TS, y + h - WALL_T - 4 - TS],
-    ];
-    for (const [lx, ly] of corners) this.place(lx, ly, T.lamp, S);
+    ] as [number, number][])
+      this.place(lx, ly, T.lamp);
   }
 
-  /** 휴식 공간 — 화분, 벤치, 연못 */
+  /** 휴식 공간 — 소파·안락의자·커피 테이블·러그·화분·연못 */
   private restDecorations({ x, y, w, h }: ZoneDef) {
     const ix = x + WALL_T, iy = y + WALL_T;
     const iw = w - WALL_T * 2, ih = h - WALL_T * 2;
-    const S = 3;
-    const TS = 16 * S;
+    const mcx = ix + iw / 2, mcy = iy + ih / 2;
 
-    // 잔디 그라운드
+    // 잔디 바닥 오버레이
     const g = new Graphics();
-    g.rect(ix + 8, iy + 8, iw - 16, ih - 16).fill({ color: 0x0a1a0a, alpha: 0.45 });
+    g.rect(ix + 8, iy + 8, iw - 16, ih - 16).fill({ color: 0x0a1a0a, alpha: 0.3 });
     this.addChild(g);
 
-    // 화분 — 대형 × 2, 소형 × 2
-    this.place(ix + 16,          iy + 24,          T.plantLg, S);
-    this.place(ix + iw - TS - 16, iy + 24,         T.plantLg, S);
-    this.place(ix + 16,          iy + ih - TS - 16, T.plantSm, S);
-    this.place(ix + iw - TS - 16, iy + ih - TS - 16, T.plantSm, S);
+    // 화분 × 4
+    this.place(ix + 8,          iy + 8,          T.plantLg);
+    this.place(ix + iw - TS - 8, iy + 8,         T.plantLg);
+    this.place(ix + 8,          iy + ih - TS - 8, T.plantSm);
+    this.place(ix + iw - TS - 8, iy + ih - TS - 8, T.plantSm);
 
-    // 벤치 (가운데)
-    const bcx = ix + iw / 2 - TS;
-    this.place(bcx,       iy + ih / 2 - TS / 2, T.chairE, S);
-    this.place(bcx + TS,  iy + ih / 2 - TS / 2, T.chairW, S);
+    // 소파 (상단, 가로 3타일)
+    const sofaX = mcx - TS * 1.5, sofaY = iy + 16;
+    this.place(sofaX,          sofaY, T.sofaL);
+    this.place(sofaX + TS,     sofaY, T.sofaM);
+    this.place(sofaX + TS * 2, sofaY, T.sofaR);
 
-    // 연못 (Graphics — 타원)
-    const pond = { x: ix + 54, y: iy + ih - 65 };
+    // 러그 (소파 아래 ~ 테이블 위치, 3×2)
+    const rugX = mcx - TS * 1.5, rugY = sofaY + TS + 8;
+    this.place(rugX,          rugY,      T.rugTL);
+    this.place(rugX + TS,     rugY,      T.rugTM);
+    this.place(rugX + TS * 2, rugY,      T.rugTR);
+    this.place(rugX,          rugY + TS, T.rugBL);
+    this.place(rugX + TS,     rugY + TS, T.rugBM);
+    this.place(rugX + TS * 2, rugY + TS, T.rugBR);
+
+    // 커피 테이블 (러그 위)
+    const tblX = mcx - TS, tblY = mcy - TS / 2;
+    this.place(tblX,      tblY, T.tableL);
+    this.place(tblX + TS, tblY, T.tableR);
+
+    // 안락의자 (소파 맞은편, 좌우)
+    this.place(ix + 12,           mcy - TS / 2, T.chairE);
+    this.place(ix + iw - TS - 12, mcy - TS / 2, T.chairW);
+
+    // 연못 (Graphics — 오른쪽 하단)
     const pg = new Graphics();
-    pg.circle(pond.x, pond.y, 28).fill({ color: 0x071628 });
-    pg.circle(pond.x, pond.y, 28).stroke({ color: 0x0ea5e9, alpha: 0.4, width: 2 });
-    pg.circle(pond.x, pond.y, 12).fill({ color: 0x0369a1, alpha: 0.5 });
+    const pondX = ix + iw - 72, pondY = iy + ih - 72;
+    pg.circle(pondX, pondY, 36).fill({ color: 0x071628 });
+    pg.circle(pondX, pondY, 36).stroke({ color: 0x0ea5e9, alpha: 0.4, width: 2 });
+    pg.circle(pondX, pondY, 16).fill({ color: 0x0369a1, alpha: 0.5 });
     this.addChild(pg);
   }
 
-  /** 스터디룸 — 책장, 모니터 책상, 의자 */
+  /** 스터디룸 — 상단 책장·학생 책상(2×2)·강사 책상 */
   private studyDecorations({ x, y, w, h, color }: ZoneDef) {
     const ix = x + WALL_T, iy = y + WALL_T;
     const iw = w - WALL_T * 2, ih = h - WALL_T * 2;
-    const S = 3;
-    const TS = 16 * S;  // 48px
 
-    // 상단 벽 책장 행 (shelfT + shelfB 세로 2타일 = 96px)
+    // 상단 책장 행 (shelfT + shelfB = 세로 2타일)
     for (let bx = ix + 4; bx + TS <= ix + iw - 4; bx += TS + 4) {
-      this.place(bx, iy + 4,      T.shelfT, S);
-      this.place(bx, iy + 4 + TS, T.shelfB, S);
+      this.place(bx, iy + 4,       T.shelfT);
+      this.place(bx, iy + 4 + TS,  T.shelfB);
     }
 
-    // 학생 책상 2행 × 3열
-    const deskRows = [iy + TS * 2 + 12, iy + TS * 3 + 20];
-    const deskCols = [ix + 10, ix + iw / 2 - TS, ix + iw - TS * 2 - 10];
-    for (const dy of deskRows) {
-      for (const dx of deskCols) {
-        this.place(dx,      dy,      T.tableL,  S);
-        this.place(dx + TS, dy,      T.tableR,  S);
-        this.place(dx + TS / 4, dy + TS, T.chairN, S);
+    // 학생 책상 2행 × 2열 (여백 넉넉히)
+    const dCols = [ix + 24, ix + iw - TS * 2 - 24];
+    const dRows = [iy + TS * 2 + 24, iy + TS * 3 + 40];
+    for (const dy of dRows) {
+      for (const dx of dCols) {
+        this.place(dx,      dy,       T.tableL);
+        this.place(dx + TS, dy,       T.tableR);
+        this.place(dx + 12, dy + TS + 4, T.chairN);
       }
     }
 
-    // 강사석 (하단 중앙, 큰 책상)
-    const tdx = ix + iw / 2 - TS * 1.5;
-    const tdy = iy + ih - TS - 8;
-    this.place(tdx,       tdy, T.tableL, S);
-    this.place(tdx + TS,  tdy, T.tableR, S);
-    this.place(tdx + TS * 2, tdy, T.tableL, S);
+    // 강사 책상 (하단 중앙)
+    const stdx = ix + iw / 2 - TS, stdy = iy + ih - TS - 8;
+    this.place(stdx,      stdy, T.tableL);
+    this.place(stdx + TS, stdy, T.tableR);
+    this.place(stdx + TS / 2 - 4, stdy - TS - 4, T.chairS);
 
-    // 강사 의자 (강단 뒤)
-    this.place(tdx + TS, tdy - TS - 4, T.chairS, S);
-
-    // 배경 색 오버레이 (Graphics — 보조)
+    // 책장 뒤 오버레이 (Graphics 보조)
     const g = new Graphics();
     g.rect(ix + 4, iy + 4, iw - 8, TS * 2 + 4).fill({ color, alpha: 0.03 });
     this.addChild(g);
-    void color;
   }
 
-  /** 자료실 — 사방 책장, 중앙 열람 테이블 */
-  private libraryDecorations({ x, y, w, h, color }: ZoneDef) {
+  /** 자료실 — 상단 책장·왼쪽 대형 책장·중앙 열람 테이블·조명 */
+  private libraryDecorations({ x, y, w, h }: ZoneDef) {
     const ix = x + WALL_T, iy = y + WALL_T;
     const iw = w - WALL_T * 2, ih = h - WALL_T * 2;
-    const S = 3;
-    const TS = 16 * S;
 
     // 상단 책장
     for (let bx = ix + 4; bx + TS <= ix + iw - 4; bx += TS + 4) {
-      this.place(bx, iy + 4,      T.shelfT, S);
-      this.place(bx, iy + 4 + TS, T.shelfB, S);
+      this.place(bx, iy + 4,      T.shelfT);
+      this.place(bx, iy + 4 + TS, T.shelfB);
     }
 
-    // 왼쪽 책장 (출입구 반대편)
-    for (let by = iy + TS * 2 + 12; by + TS * 2 <= iy + ih - 8; by += TS * 2 + 6) {
-      this.place(ix + 4, by,      T.bigShelfL, S);
-      this.place(ix + 4, by + TS, T.bigShelfR, S);
+    // 왼쪽 대형 책장 (bigShelfL+R, 출입구 반대편)
+    for (let by = iy + TS * 2 + 20; by + TS * 2 <= iy + ih - 8; by += TS * 2 + 12) {
+      this.place(ix + 4,       by, T.bigShelfL);
+      this.place(ix + 4 + TS,  by, T.bigShelfR);
     }
 
-    // 중앙 열람 테이블 (가로 4타일)
-    const tcx = ix + iw / 2 - TS * 2;
-    const tcy = iy + ih / 2 - TS / 2;
-    this.place(tcx,          tcy, T.tableL, S);
-    this.place(tcx + TS,     tcy, T.tableR, S);
-    this.place(tcx + TS * 2, tcy, T.tableL, S);
-    this.place(tcx + TS * 3, tcy, T.tableR, S);
+    // 중앙 열람 테이블 (4타일 가로)
+    const tcx = ix + iw / 2 - TS * 2, tcy = iy + ih / 2 - TS / 2;
+    this.place(tcx,          tcy, T.tableL);
+    this.place(tcx + TS,     tcy, T.tableR);
+    this.place(tcx + TS * 2, tcy, T.tableL);
+    this.place(tcx + TS * 3, tcy, T.tableR);
 
-    // 의자 (테이블 양쪽)
-    this.place(tcx - TS - 4,      tcy, T.chairE, S);
-    this.place(tcx + TS * 4 + 4,  tcy, T.chairW, S);
+    // 의자 (테이블 좌우, 위아래)
+    this.place(tcx - TS - 4,     tcy, T.chairE);
+    this.place(tcx + TS * 4 + 4, tcy, T.chairW);
+    this.place(tcx + TS,     tcy - TS - 4, T.chairS);
+    this.place(tcx + TS * 2, tcy - TS - 4, T.chairS);
 
-    // 스탠드 조명
-    this.place(ix + iw - TS - 8, iy + ih - TS - 8, T.lamp, S);
-
-    void color;
+    // 조명 (오른쪽 하단 모서리)
+    this.place(ix + iw - TS - 8, iy + ih - TS - 8, T.lamp);
   }
 
-  /** 상담실 — 소파, 커피 테이블, 러그, 화분 */
-  private counselDecorations({ x, y, w, h, color }: ZoneDef) {
+  /** 상담실 — 소파·러그·커피 테이블·안락의자·화분 */
+  private counselDecorations({ x, y, w, h }: ZoneDef) {
     const ix = x + WALL_T, iy = y + WALL_T;
     const iw = w - WALL_T * 2, ih = h - WALL_T * 2;
-    const cx = ix + iw / 2, cy = iy + ih / 2;
-    const S = 3;
-    const TS = 16 * S;
+    const mcx = ix + iw / 2, mcy = iy + ih / 2;
 
-    // 러그 (3×2 타일)
-    const rugX = cx - TS * 1.5;
-    const rugY = cy - TS;
-    this.place(rugX,          rugY,      T.rugTL, S);
-    this.place(rugX + TS,     rugY,      T.rugTM, S);
-    this.place(rugX + TS * 2, rugY,      T.rugTR, S);
-    this.place(rugX,          rugY + TS, T.rugBL, S);
-    this.place(rugX + TS,     rugY + TS, T.rugBM, S);
-    this.place(rugX + TS * 2, rugY + TS, T.rugBR, S);
+    // 소파 (상단 중앙, 3타일)
+    const sfX = mcx - TS * 1.5, sfY = iy + 16;
+    this.place(sfX,          sfY, T.sofaL);
+    this.place(sfX + TS,     sfY, T.sofaM);
+    this.place(sfX + TS * 2, sfY, T.sofaR);
 
-    // 소파 (상단, 3타일)
-    const sofaX = cx - TS * 1.5;
-    const sofaY = iy + 10;
-    this.place(sofaX,          sofaY, T.sofaL, S);
-    this.place(sofaX + TS,     sofaY, T.sofaM, S);
-    this.place(sofaX + TS * 2, sofaY, T.sofaR, S);
+    // 러그 (3×2, 세팅 중앙)
+    const rgX = mcx - TS * 1.5, rgY = mcy - TS;
+    this.place(rgX,          rgY,      T.rugTL);
+    this.place(rgX + TS,     rgY,      T.rugTM);
+    this.place(rgX + TS * 2, rgY,      T.rugTR);
+    this.place(rgX,          rgY + TS, T.rugBL);
+    this.place(rgX + TS,     rgY + TS, T.rugBM);
+    this.place(rgX + TS * 2, rgY + TS, T.rugBR);
 
-    // 커피 테이블 (가운데)
-    this.place(cx - TS,     cy - TS / 2, T.tableL, S);
-    this.place(cx,          cy - TS / 2, T.tableR, S);
+    // 커피 테이블 (러그 위, 중앙)
+    this.place(mcx - TS,     mcy - TS / 2, T.tableL);
+    this.place(mcx,          mcy - TS / 2, T.tableR);
 
-    // 안락의자 (좌우)
-    this.place(ix + 8,          cy - TS / 2, T.chairE, S);
-    this.place(ix + iw - TS - 8, cy - TS / 2, T.chairW, S);
+    // 안락의자 (좌우, 테이블 맞은편)
+    this.place(ix + 12,            mcy - TS / 2, T.chairE);
+    this.place(ix + iw - TS - 12,  mcy - TS / 2, T.chairW);
 
-    // 화분 (하단 모서리)
-    this.place(ix + 8,           iy + ih - TS - 8, T.plantLg, S);
-    this.place(ix + iw - TS - 8, iy + ih - TS - 8, T.plantLg, S);
-
-    void color;
+    // 화분 (하단 모서리 × 2)
+    this.place(ix + 8,              iy + ih - TS - 8, T.plantLg);
+    this.place(ix + iw - TS - 8,    iy + ih - TS - 8, T.plantLg);
   }
 
-  // ── 벽 렌더링 ────────────────────────────────────────────────────────────
+  // ── 벽 렌더링 ─────────────────────────────────────────────────────────────
 
   private drawAllWalls() {
     const g = new Graphics();
