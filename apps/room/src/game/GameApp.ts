@@ -23,6 +23,7 @@ import type { PlayerInfo } from "../core/realtime/colyseusClient.js";
 import { Avatar } from "./entities/Avatar.js";
 import { MapRenderer, MAP_WIDTH, MAP_HEIGHT, WALL_RECTS } from "./world/mapRenderer.js";
 import { KeyboardInput } from "./input/keyboard.js";
+import tilesetUrl from "../assets/roguelikeIndoor.png";
 
 const MOVE_SPEED = 220;      // 초당 픽셀 이동 속도
 const SEND_INTERVAL_MS = 50; // 서버에 위치 전송 주기 (20Hz, 매 프레임 보내면 과부하)
@@ -69,7 +70,7 @@ export class GameApp {
     self.viewport = viewport;
     app.stage.addChild(viewport);
 
-    const tileset = await Assets.load<Texture>("/assets/roguelikeIndoor.png");
+    const tileset = await Assets.load<Texture>(tilesetUrl);
     viewport.addChild(new MapRenderer(tileset));
 
     self.keyboard = new KeyboardInput();
