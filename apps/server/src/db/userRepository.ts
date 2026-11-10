@@ -36,6 +36,14 @@ export async function updateUser(id: string, data: { role?: Role; groupId?: stri
   return prisma.user.update({ where: { id }, data });
 }
 
+export async function findUsersByGroupId(groupId: string) {
+  return prisma.user.findMany({
+    where: { groupId },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+}
+
 export async function upsertTestUser(data: {
   email: string;
   name: string;

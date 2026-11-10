@@ -37,6 +37,7 @@ import { ScreenShareOverlay } from "./ScreenShareOverlay.js";
 import { RoomSwitcher } from "./RoomSwitcher.js";
 import { playChatNotification } from "./chatNotificationSound.js";
 import { StudyTimerPanel, type PlayerTimer } from "./StudyTimerPanel.js";
+import { StudyStatsModal } from "./StudyStatsModal.js";
 import { createApiClient, useAuthStore } from "@mentoring/ui";
 
 const api = createApiClient(import.meta.env.VITE_API_URL);
@@ -76,6 +77,7 @@ export function RoomPage() {
     const navigate = useNavigate();
 
     const [chatOpen, setChatOpen] = useState(true);
+    const [showStudyStats, setShowStudyStats] = useState(false);
     const [micOn, setMicOn] = useState(false);
     const [camOn, setCamOn] = useState(false);
     const [notifSoundOn, setNotifSoundOn] = useState<boolean>(() => {
@@ -541,6 +543,7 @@ export function RoomPage() {
     }
 
     return (
+        <>
         <div className="h-screen flex flex-col font-[Pretendard,sans-serif]">
             {wsDisconnected && (
                 <div className="w-full bg-[#e03131] text-white text-xs text-center py-2 shrink-0">
@@ -573,6 +576,17 @@ export function RoomPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setShowStudyStats(true)}
+                        title="공부 시간 확인하기"
+                        className="h-8 px-3 flex items-center gap-1.5 rounded-lg hover:bg-[#f4f6f9] text-[#767676] hover:text-[#17171b] transition-colors cursor-pointer text-xs font-medium"
+                    >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 8v4l2.5 2.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        공부 시간
+                    </button>
                     {isPresenter && roomId && <RoomSwitcher currentRoomId={roomId} />}
                     <button
                         type="button"
@@ -814,6 +828,10 @@ export function RoomPage() {
                 </button>
             </div>
         </div>
+        {showStudyStats && roomId && (
+            <StudyStatsModal roomId={roomId} onClose={() => setShowStudyStats(false)} />
+        )}
+        </>
     );
 }
 
