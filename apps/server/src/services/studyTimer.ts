@@ -15,7 +15,7 @@ export interface TimerState {
   dayKey: string;    // KST YYYY-MM-DD
 }
 
-function kstDayKey(now = Date.now()): string {
+export function kstDayKey(now = Date.now()): string {
   // KST = UTC+9. ms에 9시간 더해 UTC 포맷으로 변환해도 날짜 부분은 KST와 동일.
   return new Date(now + 9 * 3600_000).toISOString().slice(0, 10);
 }
@@ -55,6 +55,33 @@ export function pauseTimer(userId: string): TimerState {
     t.status = "paused";
   }
   return t;
+}
+
+/** 현재 누적 초 (running 중이면 경과시간 포함). DB 저장용. */
+export function getCurrentTotalSeconds(userId: string): number {
+  const t = getTimer(userId);
+  if (t.status === "running") {
+    return t.accumulatedSec + Math.floor((Date.now() - t.startedAt) / 1000);
+  }
+  return t.accumulatedSec;
+}
+
+/**
+ * 날짜가 바뀐 경우 이전 날짜 key와 그 시점의 누적 초를 반환하고 메모리를 fresh로 교체.
+ * 이미 오늘이면 null 반환.
+ */
+export function flushDayReset(userId: string): { prevDate: string; totalSeconds: number } | null {
+  const today = kstDayKey();
+  const existing = timers.get(userId);
+  if (!existing || existing.dayKey === today) return null;
+
+  let totalSeconds = existing.accumulatedSec;
+  if (existing.status === "running") {
+    totalSeconds += Math.floor((Date.now() - existing.startedAt) / 1000);
+  }
+  const prevDate = existing.dayKey;
+  timers.set(userId, fresh());
+  return { prevDate, totalSeconds };
 }
 
 /** 완전 리셋 (사용자 결정: '정지' = 0초로). */

@@ -35,3 +35,10 @@ infra/coturn/turnserver.conf
 # IDE
 .vscode/
 .idea/
+
+# 로컬 에셋/캡처 (git 추적 불필요)
+assets/
+captures/
+
+# Module Federation 자동 생성 진단 파일
+**/.mf/

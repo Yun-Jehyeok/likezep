@@ -22,7 +22,8 @@ import { findRoomById } from "../db/roomRepository.js";
 import { findUserById } from "../db/userRepository.js";
 import { logAccess } from "../db/accessLogRepository.js";
 import { saveMessage } from "../db/chatRepository.js";
-import { getTimer, startTimer, pauseTimer, stopTimer, type TimerState } from "../services/studyTimer.js";
+import { getTimer, startTimer, pauseTimer, stopTimer, flushDayReset, type TimerState } from "../services/studyTimer.js";
+import { upsertStudyLog } from "../db/studyLogRepository.js";
 import type { AuthPayload } from "../api/middleware/auth.js";
 import type {
   MovePayload,
@@ -164,7 +165,9 @@ export class ProximityRoom extends Room<ProximityRoomState> {
     this.onMessage("timer-pause", (client: Client) => {
       const userId = this.userIdBySession.get(client.sessionId);
       if (!userId) return;
-      this.applyTimerToPlayer(client.sessionId, pauseTimer(userId));
+      const t = pauseTimer(userId);
+      this.applyTimerToPlayer(client.sessionId, t);
+      upsertStudyLog(userId, t.dayKey, t.accumulatedSec).catch(console.error);
     });
     this.onMessage("timer-stop", (client: Client) => {
       const userId = this.userIdBySession.get(client.sessionId);
@@ -172,8 +175,7 @@ export class ProximityRoom extends Room<ProximityRoomState> {
       this.applyTimerToPlayer(client.sessionId, stopTimer(userId));
     });
 
-    // 매 분 자정 체크: getTimer()의 lazy 리셋을 끌어내 player state에 반영.
-    // 유저가 아무 액션 안 해도 KST 자정 지나면 state가 0으로 돌아온다.
+    // 매 분 자정 체크: 날짜가 바뀐 유저의 이전 날짜 데이터를 DB에 플러시 후 state 갱신.
     this.clock.setInterval(() => this.syncAllTimers(), 60_000);
   }
 
@@ -187,6 +189,10 @@ export class ProximityRoom extends Room<ProximityRoomState> {
 
   private syncAllTimers() {
     for (const [sessionId, userId] of this.userIdBySession) {
+      const flushed = flushDayReset(userId);
+      if (flushed) {
+        upsertStudyLog(userId, flushed.prevDate, flushed.totalSeconds).catch(console.error);
+      }
       this.applyTimerToPlayer(sessionId, getTimer(userId));
     }
   }
@@ -269,6 +275,10 @@ export class ProximityRoom extends Room<ProximityRoomState> {
     const auth = client.auth as AuthPayload | undefined;
     this.userNames.delete(client.sessionId);
     this.userIdBySession.delete(client.sessionId);
+    if (auth?.userId) {
+      const t = pauseTimer(auth.userId);
+      upsertStudyLog(auth.userId, t.dayKey, t.accumulatedSec).catch(console.error);
+    }
     if (auth?.userId && this.dbRoomId) {
       logAccess(auth.userId, this.dbRoomId, "leave").catch(console.error);
     }

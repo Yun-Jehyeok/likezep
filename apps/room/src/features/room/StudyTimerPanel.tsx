@@ -92,6 +92,9 @@ export function StudyTimerPanel({ timers, mySessionId, onStart, onPause }: Props
                     <div className="flex items-center gap-1.5 truncate min-w-0">
                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
                       <span className="truncate">{t.name}{isMe && " (나)"}</span>
+                      {currentSeconds(t) >= 14400 && (
+                        <span className="shrink-0 text-[9px] font-bold text-white bg-[#0071ff] rounded px-1 py-0.5 leading-none">인증</span>
+                      )}
                     </div>
                     <span className="tabular-nums shrink-0">{formatHMS(currentSeconds(t))}</span>
                   </li>
