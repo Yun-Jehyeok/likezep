@@ -1,15 +1,18 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type CourseListItem } from "../../api";
+import { useAuthStore } from "@mentoring/ui";
 
-const CATEGORIES = ["전체", "코딩테스트", "알고리즘", "자료구조", "시스템 설계", "CS 기초"];
+const BASE_CATEGORIES = ["전체", "코딩테스트", "알고리즘", "자료구조", "시스템 설계", "CS 기초"];
+const ADMIN_ONLY_CATEGORY = "테스트 영상";
 
 const CATEGORY_COLORS: Record<string, { bg: string; icon: string }> = {
-    "코딩테스트": { bg: "#e8f1ff", icon: "#0071ff" },
-    "알고리즘":   { bg: "#e8f7ee", icon: "#1a7a3f" },
-    "자료구조":   { bg: "#f0ebff", icon: "#7c3aed" },
-    "시스템 설계": { bg: "#fff7e8", icon: "#e05c00" },
-    "CS 기초":   { bg: "#fff1f0", icon: "#e03131" },
+    "코딩테스트":    { bg: "#e8f1ff", icon: "#0071ff" },
+    "알고리즘":     { bg: "#e8f7ee", icon: "#1a7a3f" },
+    "자료구조":     { bg: "#f0ebff", icon: "#7c3aed" },
+    "시스템 설계":   { bg: "#fff7e8", icon: "#e05c00" },
+    "CS 기초":     { bg: "#fff1f0", icon: "#e03131" },
+    "테스트 영상":   { bg: "#f5f5f5", icon: "#888888" },
 };
 const DEFAULT_COLORS = { bg: "#f4f6f9", icon: "#666666" };
 
@@ -18,6 +21,9 @@ export function CourseListPage() {
     const [courses, setCourses] = useState<CourseListItem[]>([]);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
+    const user = useAuthStore((s) => s.user);
+    const isAdmin = user?.role === "admin";
+    const categories = isAdmin ? [...BASE_CATEGORIES, ADMIN_ONLY_CATEGORY] : BASE_CATEGORIES;
 
     useEffect(() => {
         setLoading(true);
@@ -62,7 +68,7 @@ export function CourseListPage() {
 
                 {/* Category chips */}
                 <div className="flex flex-wrap gap-2 mb-8">
-                    {CATEGORIES.map((cat) => (
+                    {categories.map((cat) => (
                         <button
                             key={cat}
                             type="button"
@@ -73,7 +79,7 @@ export function CourseListPage() {
                                     : "bg-white border border-border text-text-secondary hover:border-[#0071ff] hover:text-[#0071ff]"
                             }`}
                         >
-                            {cat}
+                            {cat === ADMIN_ONLY_CATEGORY ? `🔒 ${cat}` : cat}
                         </button>
                     ))}
                 </div>

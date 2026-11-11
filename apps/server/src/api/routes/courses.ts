@@ -14,9 +14,9 @@ const router: ExpressRouter = Router();
 // GET /api/courses — 발행된 강의 목록 (카테고리 필터 선택)
 router.get("/", requireAuth, async (req, res) => {
   const { category } = req.query as { category?: string };
-  const userId = req.auth!.userId;
+  const { userId, role } = req.auth!;
 
-  const courses = await findAllPublished(userId, category || undefined);
+  const courses = await findAllPublished(userId, role, category || undefined);
 
   const withThumbnails = await Promise.all(
     courses.map(async (c) => ({
@@ -36,7 +36,7 @@ router.get("/:courseId", requireAuth, async (req, res) => {
     return;
   }
 
-  const course = await findPublishedById(courseId, req.auth!.userId);
+  const course = await findPublishedById(courseId, req.auth!.userId, req.auth!.role);
   if (!course) {
     res.status(404).json({ error: { code: "NOT_FOUND", message: "Course not found" } });
     return;
@@ -55,7 +55,7 @@ router.get("/:courseId/lessons/:lessonId/video-url", requireAuth, async (req, re
     return;
   }
 
-  const lesson = await findPublishedLesson(courseId, lessonId);
+  const lesson = await findPublishedLesson(courseId, lessonId, req.auth!.role);
   if (!lesson) {
     res.status(404).json({ error: { code: "NOT_FOUND", message: "Lesson not found" } });
     return;
@@ -75,7 +75,7 @@ router.get("/:courseId/materials/:materialId/download-url", requireAuth, async (
     return;
   }
 
-  const material = await findMaterial(courseId, materialId);
+  const material = await findMaterial(courseId, materialId, req.auth!.role);
   if (!material) {
     res.status(404).json({ error: { code: "NOT_FOUND", message: "Material not found" } });
     return;
@@ -102,7 +102,7 @@ router.post("/:courseId/lessons/:lessonId/progress", requireAuth, async (req, re
   }
 
   // 레슨 존재 + 발행 여부 확인
-  const lesson = await findPublishedLesson(courseId, lessonId);
+  const lesson = await findPublishedLesson(courseId, lessonId, req.auth!.role);
   if (!lesson) {
     res.status(404).json({ error: { code: "NOT_FOUND", message: "Lesson not found" } });
     return;

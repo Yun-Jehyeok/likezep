@@ -37,8 +37,19 @@ infra/coturn/turnserver.conf
 .idea/
 
 # 로컬 에셋/캡처 (git 추적 불필요)
-assets/
+/assets/
 captures/
+
+# 임시 E2E 테스트 (test-feature 스킬 생성)
+e2e/ad-hoc/
+
+# Playwright MCP 자동 생성 파일
+.playwright-mcp/
+
+# work/ 자동 생성 파일 (스크린샷·로그)
+work/*.png
+work/*.log
+work/tasks/*/screenshots/
 
 # Module Federation 자동 생성 진단 파일
 **/.mf/

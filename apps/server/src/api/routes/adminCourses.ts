@@ -21,8 +21,8 @@ router.use(requireAuth, requireAdmin);
 
 // POST /api/admin/courses — 강의 생성
 router.post("/", async (req, res) => {
-  const { category, title, description, order } = req.body as {
-    category?: string; title?: string; description?: string; order?: number;
+  const { category, title, description, order, isAdminOnly } = req.body as {
+    category?: string; title?: string; description?: string; order?: number; isAdminOnly?: boolean;
   };
 
   if (!category?.trim() || !title?.trim()) {
@@ -35,6 +35,7 @@ router.post("/", async (req, res) => {
     title: title.trim(),
     description: description?.trim(),
     order: order ?? 0,
+    isAdminOnly: isAdminOnly === true,
   });
 
   res.status(201).json({ id: course.id });
@@ -48,9 +49,9 @@ router.put("/:courseId", async (req, res) => {
     return;
   }
 
-  const { title, category, description, thumbnail, order, isPublished } = req.body as {
+  const { title, category, description, thumbnail, order, isPublished, isAdminOnly } = req.body as {
     title?: string; category?: string; description?: string;
-    thumbnail?: string; order?: number; isPublished?: boolean;
+    thumbnail?: string; order?: number; isPublished?: boolean; isAdminOnly?: boolean;
   };
 
   const data: Parameters<typeof updateCourse>[1] = {};
@@ -60,6 +61,7 @@ router.put("/:courseId", async (req, res) => {
   if (thumbnail !== undefined) data.thumbnail = thumbnail;
   if (order !== undefined) data.order = order;
   if (isPublished !== undefined) data.isPublished = isPublished;
+  if (isAdminOnly !== undefined) data.isAdminOnly = isAdminOnly;
 
   await updateCourse(courseId, data);
   res.json({ ok: true });

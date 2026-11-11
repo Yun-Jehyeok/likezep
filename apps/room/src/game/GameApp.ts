@@ -70,8 +70,12 @@ export class GameApp {
     self.viewport = viewport;
     app.stage.addChild(viewport);
 
-    const tileset = await Assets.load<Texture>("/assets/roguelikeIndoor.png");
-    viewport.addChild(new MapRenderer(tileset));
+    const [tileset, lpcOutside, lpcInterior] = await Promise.all([
+      Assets.load<Texture>("/assets/roguelikeIndoor.png"),
+      Assets.load<Texture>("/assets/lpc-outside.png"),
+      Assets.load<Texture>("/assets/lpc-interior.png"),
+    ]);
+    viewport.addChild(new MapRenderer(tileset, lpcOutside, lpcInterior));
 
     self.keyboard = new KeyboardInput();
 
