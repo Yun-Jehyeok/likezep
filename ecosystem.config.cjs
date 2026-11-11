@@ -5,8 +5,8 @@ module.exports = {
     {
       name: "likezep-server",
       script: "apps/server/dist/index.js",
+      interpreter_args: "--env-file=/home/ubuntu/likezep/apps/server/.env",
       cwd: "/home/ubuntu/likezep",
-      env_file: "/home/ubuntu/likezep/apps/server/.env",
     },
   ],
 };
