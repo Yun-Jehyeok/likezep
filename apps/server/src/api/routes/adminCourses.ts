@@ -21,8 +21,8 @@ router.use(requireAuth, requireAdmin);
 
 // POST /api/admin/courses — 강의 생성
 router.post("/", async (req, res) => {
-  const { category, title, description, order, isAdminOnly } = req.body as {
-    category?: string; title?: string; description?: string; order?: number; isAdminOnly?: boolean;
+  const { category, title, description, thumbnail, order, isAdminOnly } = req.body as {
+    category?: string; title?: string; description?: string; thumbnail?: string; order?: number; isAdminOnly?: boolean;
   };
 
   if (!category?.trim() || !title?.trim()) {
@@ -34,6 +34,7 @@ router.post("/", async (req, res) => {
     category: category.trim(),
     title: title.trim(),
     description: description?.trim(),
+    thumbnail: thumbnail?.trim(),
     order: order ?? 0,
     isAdminOnly: isAdminOnly === true,
   });

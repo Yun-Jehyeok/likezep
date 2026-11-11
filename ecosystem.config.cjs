@@ -4,10 +4,9 @@ module.exports = {
   apps: [
     {
       name: "likezep-server",
-      script: "pnpm",
-      args: "--filter @mentoring/server dev",
+      script: "apps/server/dist/index.js",
       cwd: "/home/ubuntu/likezep",
-      env_file: "apps/server/.env",
+      env_file: "/home/ubuntu/likezep/apps/server/.env",
     },
   ],
 };
