@@ -167,6 +167,7 @@ export async function createCourse(data: {
   category: string;
   title: string;
   description?: string;
+  thumbnail?: string;
   order?: number;
   isAdminOnly?: boolean;
 }) {
