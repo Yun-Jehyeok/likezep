@@ -108,13 +108,14 @@ model Course {
   thumbnail   String?
   order       Int        @default(0)
   isPublished Boolean    @default(false) @map("is_published")
+  isAdminOnly Boolean    @default(false) @map("is_admin_only")
   createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz
 
   lessons  Lesson[]
   materials Material[]
 
-  @@index([category, isPublished])
+  @@index([category, isPublished, isAdminOnly])
   @@map("courses")
 }
 

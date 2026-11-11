@@ -33,12 +33,13 @@ export interface CourseDetail {
 }
 
 /** 발행된 강의 목록 + 사용자별 완료 수 */
-export async function findAllPublished(userId: string, category?: string): Promise<CourseListItem[]> {
+export async function findAllPublished(userId: string, role: string, category?: string): Promise<CourseListItem[]> {
   const [courses, progressRows] = await Promise.all([
     prisma.course.findMany({
       where: {
         isPublished: true,
         ...(category ? { category } : {}),
+        ...(role !== "admin" ? { isAdminOnly: false } : {}),
       },
       include: {
         _count: { select: { lessons: { where: { isPublished: true } } } },
@@ -66,9 +67,9 @@ export async function findAllPublished(userId: string, category?: string): Promi
 }
 
 /** 발행된 강의 상세 (레슨 + 자료 + 사용자 진행률 포함) */
-export async function findPublishedById(courseId: number, userId: string): Promise<CourseDetail | null> {
+export async function findPublishedById(courseId: number, userId: string, role: string): Promise<CourseDetail | null> {
   const course = await prisma.course.findFirst({
-    where: { id: courseId, isPublished: true },
+    where: { id: courseId, isPublished: true, ...(role !== "admin" ? { isAdminOnly: false } : {}) },
     include: {
       lessons: {
         where: { isPublished: true },
@@ -111,10 +112,11 @@ export async function findPublishedById(courseId: number, userId: string): Promi
 /** 발행된 레슨의 videoKey 조회 (presigned URL 발급용) */
 export async function findPublishedLesson(
   courseId: number,
-  lessonId: number
+  lessonId: number,
+  role: string
 ): Promise<{ videoKey: string } | null> {
   const lesson = await prisma.lesson.findFirst({
-    where: { id: lessonId, courseId, isPublished: true, course: { isPublished: true } },
+    where: { id: lessonId, courseId, isPublished: true, course: { isPublished: true, ...(role !== "admin" ? { isAdminOnly: false } : {}) } },
     select: { videoKey: true },
   });
   return lesson;
@@ -123,10 +125,11 @@ export async function findPublishedLesson(
 /** 자료 조회 (download presigned URL 발급용) */
 export async function findMaterial(
   courseId: number,
-  materialId: number
+  materialId: number,
+  role: string
 ): Promise<{ fileKey: string; name: string } | null> {
   const material = await prisma.material.findFirst({
-    where: { id: materialId, courseId, course: { isPublished: true } },
+    where: { id: materialId, courseId, course: { isPublished: true, ...(role !== "admin" ? { isAdminOnly: false } : {}) } },
     select: { fileKey: true, name: true },
   });
   return material;
@@ -165,13 +168,14 @@ export async function createCourse(data: {
   title: string;
   description?: string;
   order?: number;
+  isAdminOnly?: boolean;
 }) {
   return prisma.course.create({ data });
 }
 
 export async function updateCourse(
   courseId: number,
-  data: Partial<{ title: string; category: string; description: string; thumbnail: string; order: number; isPublished: boolean }>
+  data: Partial<{ title: string; category: string; description: string; thumbnail: string; order: number; isPublished: boolean; isAdminOnly: boolean }>
 ) {
   return prisma.course.update({ where: { id: courseId }, data });
 }
