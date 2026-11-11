@@ -10,8 +10,8 @@
         "preview": "vite preview"
     },
     "dependencies": {
-        "@mentoring/ui": "workspace:*",
         "@mentoring/shared": "workspace:*",
+        "@mentoring/ui": "workspace:*",
         "@module-federation/vite": "1.23.5",
         "@tailwindcss/vite": "4.3.3",
         "react": "^18.3.1",
@@ -29,6 +29,7 @@
         "eslint-plugin-react-hooks": "^5.0.0",
         "eslint-plugin-react-refresh": "^0.4.14",
         "globals": "^15.12.0",
+        "rollup-plugin-visualizer": "^7.1.3",
         "typescript": "~5.6.2",
         "typescript-eslint": "^8.15.0",
         "vite": "^6.0.0"
