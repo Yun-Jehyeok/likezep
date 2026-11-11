@@ -230,6 +230,7 @@ export function CoursePage() {
                                 key={videoUrl}
                                 src={videoUrl}
                                 controls
+                                crossOrigin="anonymous"
                                 className="w-full h-full"
                                 onTimeUpdate={handleTimeUpdate}
                                 onLoadedMetadata={handleLoadedMetadata}
