@@ -418,13 +418,13 @@ export class MapRenderer extends Container {
     const { x: rx, y: ry, w: rw, h: rh } = REST;
     mark(rx + rw - WALL_T, ry + rh / 2 - ENTRY_W / 2, WALL_T, ENTRY_W);
 
-    const { x: sx, y: sy, w: _sw, h: sh } = STUDY;
+    const { x: sx, y: sy, h: sh } = STUDY;
     mark(sx, sy + sh / 2 - ENTRY_W / 2, WALL_T, ENTRY_W);
 
     const { x: lx, y: ly, w: lw, h: lh } = LIBRARY;
     mark(lx + lw - WALL_T, ly + lh / 2 - ENTRY_W / 2, WALL_T, ENTRY_W);
 
-    const { x: cox, y: coy, w: _cow, h: coh } = COUNSEL;
+    const { x: cox, y: coy, h: coh } = COUNSEL;
     mark(cox, coy + coh / 2 - ENTRY_W / 2, WALL_T, ENTRY_W);
 
     this.addChild(g);
