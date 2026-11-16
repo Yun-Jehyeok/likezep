@@ -8,7 +8,7 @@ import { AdminPage } from "../features/admin/AdminPage";
 import { trackRemoteLoad } from "../monitoring";
 import { LearnSkeleton } from "./Skeleton";
 import { loadLearnApp } from "./remotes";
-import { LEARN_LIST_API, prefetchApi } from "./prefetch";
+import { LEARN_LIST_API, prefetchApi, preloadListThumbnails } from "./prefetch";
 
 // remote 로드를 Sentry 스팬으로 감싼다 (트랜잭션 유지 + remote 로드 시간 측정, monitoring.ts 참고)
 // learn은 로비에서 미리 받을 수 있어 같은 로더를 공유한다 (remotes.ts)
@@ -52,7 +52,8 @@ function RequireAssigned({ children }: { children: React.ReactNode }) {
 function LearnDataPrefetch() {
     const { pathname } = useLocation();
     useLayoutEffect(() => {
-        if (/^\/learn\/?$/.test(pathname)) prefetchApi(LEARN_LIST_API);
+        // 응답이 오면 첫 화면 썸네일도 바로 받는다 (learn이 그려지기 전에)
+        if (/^\/learn\/?$/.test(pathname)) prefetchApi(LEARN_LIST_API, preloadListThumbnails);
     }, [pathname]);
     return null;
 }
