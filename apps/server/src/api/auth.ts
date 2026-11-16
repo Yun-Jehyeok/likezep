@@ -77,12 +77,24 @@ router.post("/google", async (req, res) => {
 });
 
 // POST /api/auth/refresh  — 유효한 토큰으로 새 7일 토큰 발급 (sliding session)
-router.post("/refresh", requireAuth, (req, res) => {
-  const token = issueToken(req.auth!);
-  res.json({ token });
+// role/groupId는 DB의 최신 값으로 다시 채운다. 로그인 후 그룹 배정·역할 변경이 있어도
+// 새 토큰에 반영되어야 GET /api/rooms 같은 JWT 기반 필터가 맞게 동작한다.
+router.post("/refresh", requireAuth, async (req, res) => {
+  try {
+    const user = await findUserById(req.auth!.userId);
+    if (!user) {
+      res.status(401).json({ error: { code: "UNAUTHORIZED", message: "User not found" } });
+      return;
+    }
+    const token = issueToken({ userId: user.id, role: user.role, groupId: user.groupId });
+    res.json({ token });
+  } catch (err) {
+    console.error("[auth/refresh]", err);
+    res.status(500).json({ error: { code: "INTERNAL", message: "Token refresh failed" } });
+  }
 });
 
-// GET /api/me  — 현재 유저 정보 반환 (그룹 배정 대기 중 폴링에 사용)
+// GET /api/auth/me  — 현재 유저 정보 반환 (그룹 배정 대기 중 폴링에 사용)
 // 멘티가 로그인 후 groupId가 배정됐는지 주기적으로 확인할 때 이 엔드포인트를 호출한다
 router.get("/me", requireAuth, async (req, res) => {
   const user = await findUserById(req.auth!.userId);

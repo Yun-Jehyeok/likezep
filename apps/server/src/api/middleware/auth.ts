@@ -53,7 +53,11 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-/** 주어진 payload로 JWT를 생성해 반환한다. 유효기간 7일 (sliding session). */
-export function issueToken(payload: AuthPayload): string {
-  return jwt.sign(payload, config.JWT_SECRET, { expiresIn: "7d" });
+/**
+ * 주어진 payload로 JWT를 생성해 반환한다. 유효기간 7일 (sliding session).
+ * 필요한 필드만 골라서 서명한다 — jwt.verify()로 얻은 객체를 그대로 넘기면 이미 들어 있는
+ * iat/exp 때문에 jsonwebtoken이 `Bad "options.expiresIn"` 에러를 던진다.
+ */
+export function issueToken({ userId, role, groupId }: AuthPayload): string {
+  return jwt.sign({ userId, role, groupId }, config.JWT_SECRET, { expiresIn: "7d" });
 }
