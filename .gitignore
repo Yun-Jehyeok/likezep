@@ -53,3 +53,6 @@ work/tasks/*/screenshots/
 
 # Module Federation 자동 생성 진단 파일
 **/.mf/
+
+# 성능 측정 세션 (JWT 포함 — 절대 커밋 금지)
+perf/.auth/
