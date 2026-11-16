@@ -12,6 +12,7 @@
  *   18%(factor=0.18)씩 이동하면 부드럽게 추종하는 효과가 난다 (지수 감쇠 보간)
  */
 import { Container, Graphics, Text } from "pixi.js";
+import { redrawWhenFontReady } from "../fontReady";
 
 /** 아바타 색상 팔레트 — sessionId 해시로 고정 색상을 배정해 매 렌더마다 달라지지 않게 한다 */
 const PALETTE = [0xff6b35, 0x22c55e, 0xa855f7, 0xec4899, 0xeab308, 0x06b6d4];
@@ -66,6 +67,10 @@ export class Avatar extends Container {
     label.anchor.set(0.5, 0);  // x 중앙, y 상단 정렬
     label.y = 26;               // 원 반지름(20) + 여백(6)
     this.addChild(label);
+
+    // 이름 글자가 든 폰트 조각이 아직 없으면 받은 뒤 다시 그린다 (fontReady.ts 참고)
+    redrawWhenFontReady(letter);
+    redrawWhenFontReady(label);
   }
 
   /** 원격 플레이어의 새 위치를 목표로 설정 */

@@ -1,4 +1,7 @@
 import { createRoot } from "react-dom/client";
+// Pretendard 가변 폰트 dynamic subset (자체 호스팅). index.css의 Tailwind @import로 넣으면
+// 상대 url() 경로가 깨질 수 있어 따로 import한다. 생성: scripts/generate-font-css.mjs
+import "./fonts/pretendard.css";
 import "./index.css";
 import { App } from "./App";
 import { GoogleOAuthProvider } from "@react-oauth/google";
