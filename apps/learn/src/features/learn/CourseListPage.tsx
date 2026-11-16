@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type CourseListItem } from "../../api";
+import { takePrefetched } from "../../prefetch";
 import { useAuthStore } from "@mentoring/ui";
 
 const BASE_CATEGORIES = ["전체", "코딩테스트", "알고리즘", "자료구조", "시스템 설계", "CS 기초"];
@@ -28,7 +29,10 @@ export function CourseListPage() {
     useEffect(() => {
         setLoading(true);
         const query = selectedCategory === "전체" ? "" : `?category=${encodeURIComponent(selectedCategory)}`;
-        api.get<CourseListItem[]>(`/api/courses${query}`)
+        const path = `/api/courses${query}`;
+        // shell이 /learn 진입 때 먼저 시작한 요청이 있으면 그걸 쓴다(P3c). 실패했으면 직접 다시 요청
+        const prefetched = takePrefetched<CourseListItem[]>(path);
+        (prefetched ? prefetched.catch(() => api.get<CourseListItem[]>(path)) : api.get<CourseListItem[]>(path))
             .then(setCourses)
             .catch(() => setCourses([]))
             .finally(() => setLoading(false));
