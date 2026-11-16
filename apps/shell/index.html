@@ -5,6 +5,61 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>멘토링 플랫폼</title>
         <!-- Pretendard는 자체 호스팅한다 (src/fonts/pretendard.css를 main.tsx가 렌더를 막지 않게 <link>로 붙인다) -->
+        <script>
+            // MF 체인 미리 받기 — remote 쪽 (강의실 성능 P3 ③, docs/plans/learn-performance.md)
+            // cold 진입은 MF 파일을 "앞 파일을 실행해야 다음 주소를 아는" 순서로 받아 단계마다 왕복이 쌓인다.
+            // 로그인 상태로 /learn에 들어오면 각 remote의 mf-manifest.json을 받아 그 파일들을 한꺼번에 미리 받는다.
+            // - learn: expose App의 sync JS + async 중 공유 모듈 연결 청크(__loadShare__) + CSS
+            //   (async의 나머지는 react 등 공유 모듈의 대체본이라 shell이 공유하면 쓰이지 않는다. modulepreload는 import한 파일을
+            //   따라 받지 않으므로 필요한 파일을 목록으로 지정해야 한다 — Chrome 확인 2026-11-16)
+            // - room: 초기화 파일(공유 모듈 맵까지)만 — host 초기화가 room 초기화까지 기다리기 때문
+            // - <head> 맨 앞에 둔다: 렌더 차단 CSS보다 앞이라 CSS를 기다리지 않고 바로 실행된다
+            // - 미리 받은 파일은 MF 런타임이 같은 주소로 import할 때 그대로 쓰인다. 실패하면 미리 받기만 빠진다
+            // - __MF_LEARN_LOADER__는 빌드 때 shell의 learn loadRemote 청크 경로로 바뀐다 (vite.config.ts mfChainPreload)
+            (function () {
+                try {
+                    if (!localStorage.getItem("auth_token")) return;
+                    if (!/^\/learn(\/|$)/.test(location.pathname)) return;
+                    var head = document.head;
+                    var add = function (rel, href, as) {
+                        var l = document.createElement("link");
+                        l.rel = rel;
+                        l.href = href;
+                        if (as) l.as = as;
+                        if (rel === "modulepreload") l.crossOrigin = "anonymous";
+                        head.appendChild(l);
+                    };
+                    var loader = "__MF_LEARN_LOADER__";
+                    if (loader.charAt(0) === "/") add("modulepreload", loader);
+                    var preload = function (app, pick) {
+                        var base = location.origin + "/remotes/" + app + "/";
+                        fetch(base + "mf-manifest.json")
+                            .then(function (r) {
+                                return r.ok ? r.json() : null;
+                            })
+                            .then(function (m) {
+                                var e = m && m.exposes && m.exposes.filter(function (x) { return x.name === "App"; })[0];
+                                if (!e || !e.assets) return;
+                                var a = pick(e.assets);
+                                a.js.forEach(function (p) { add("modulepreload", base + p); });
+                                a.css.forEach(function (p) { add("preload", base + p, "style"); });
+                            })
+                            .catch(function () {});
+                    };
+                    preload("learn", function (a) {
+                        var shareGlue = a.js.async.filter(function (p) { return p.indexOf("__loadShare__") >= 0; });
+                        return { js: a.js.sync.concat(shareGlue), css: a.css.sync };
+                    });
+                    preload("room", function (a) {
+                        var s = a.js.sync;
+                        for (var i = 0; i < s.length; i++) if (s[i].indexOf("localSharedImportMap") >= 0) return { js: s.slice(0, i + 1), css: [] };
+                        return { js: [], css: [] };
+                    });
+                } catch (e) {
+                    /* 미리 받기는 없어도 된다 */
+                }
+            })();
+        </script>
     </head>
     <body>
         <!--
