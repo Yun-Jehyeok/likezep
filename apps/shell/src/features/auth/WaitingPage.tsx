@@ -1,11 +1,11 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { createApiClient, useAuthStore } from "@mentoring/ui";
+import { createApiClient, useAuthStore, type UserRole } from "@mentoring/ui";
 
 const api = createApiClient(import.meta.env.VITE_API_URL);
 
 export function WaitingPage() {
-    const { user, updateUser, clearAuth } = useAuthStore();
+    const { user, updateUser, setToken, clearAuth } = useAuthStore();
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -14,11 +14,20 @@ export function WaitingPage() {
                 const me = await api.get<{
                     id: string;
                     name: string;
-                    role: string;
+                    role: UserRole;
                     groupId: string | null;
-                }>("/api/me");
-                if (me.groupId) {
-                    updateUser({ groupId: me.groupId });
+                }>("/api/auth/me");
+                // 그룹이 배정됐거나 멘토/관리자로 바뀌면 대기 해제
+                if (me.groupId || me.role !== "mentee") {
+                    // 로그인 시 받은 토큰에는 groupId=null이 들어 있어 /api/rooms가 그룹 룸을 빼고 준다.
+                    // DB 최신 값으로 토큰을 다시 받아야 로비에 그룹 룸이 보인다.
+                    try {
+                        const { token } = await api.post<{ token: string }>("/api/auth/refresh", {});
+                        setToken(token);
+                    } catch {
+                        // 갱신 실패 시에도 이동은 진행 — 룸 입장 권한은 서버가 DB 기준으로 다시 확인한다
+                    }
+                    updateUser({ groupId: me.groupId, role: me.role });
                     navigate("/lobby", { replace: true });
                 }
             } catch {
@@ -26,7 +35,7 @@ export function WaitingPage() {
             }
         }, 3000);
         return () => clearInterval(poll);
-    }, [navigate, updateUser]);
+    }, [navigate, updateUser, setToken]);
 
     function handleLogout() {
         clearAuth();
