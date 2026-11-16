@@ -17,6 +17,7 @@
  *   - 가구 아래 드롭섀도
  */
 import { Container, Graphics, Text, Sprite, Texture, Rectangle } from "pixi.js";
+import { redrawWhenFontReady } from "../fontReady";
 
 export const MAP_WIDTH  = 1600;
 export const MAP_HEIGHT = 1200;
@@ -662,9 +663,12 @@ export class MapRenderer extends Container {
         },
       });
       label.alpha = 0.7;
-      label.x = zone.x + zone.w / 2 - label.width / 2;
+      // 폰트가 늦게 도착해 다시 그려지면 폭이 바뀌므로, 폭으로 계산하지 않고 anchor로 가운데 정렬
+      label.anchor.set(0.5, 0);
+      label.x = zone.x + zone.w / 2;
       label.y = zone.y + WALL_T + 5;
       this.addChild(label);
+      redrawWhenFontReady(label);
     }
   }
 }
