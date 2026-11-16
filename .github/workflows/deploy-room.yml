@@ -50,6 +50,8 @@ jobs:
           aws s3 sync apps/room/dist/ s3://${{ secrets.S3_BUCKET }}/remotes/room/ \
             --delete \
             --exclude "remoteEntry.js" \
+            --exclude "mf-manifest.json" \
+            --exclude "mf-stats.json" \
             --cache-control "public, max-age=31536000, immutable"
 
       # remoteEntry.js: shell이 매 로드마다 최신 번들을 참조해야 하므로 no-cache.
@@ -60,8 +62,16 @@ jobs:
             --cache-control "no-cache" \
             --content-type "application/javascript"
 
-      - name: Invalidate CloudFront (remoteEntry.js only)
+      # mf-manifest.json: shell이 /learn 첫 진입 때 room 초기화 파일을 미리 받는 데 쓴다(강의실 성능 P3 ③). no-cache.
+      - name: Upload mf-manifest.json (no-cache)
+        run: |
+          aws s3 cp apps/room/dist/mf-manifest.json \
+            s3://${{ secrets.S3_BUCKET }}/remotes/room/mf-manifest.json \
+            --cache-control "no-cache" \
+            --content-type "application/json"
+
+      - name: Invalidate CloudFront (remoteEntry.js, mf-manifest.json)
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/remotes/room/remoteEntry.js"
+            --paths "/remotes/room/remoteEntry.js" "/remotes/room/mf-manifest.json"

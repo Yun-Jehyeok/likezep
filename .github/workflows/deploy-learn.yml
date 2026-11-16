@@ -47,6 +47,8 @@ jobs:
           aws s3 sync apps/learn/dist/ s3://${{ secrets.S3_BUCKET }}/remotes/learn/ \
             --delete \
             --exclude "remoteEntry.js" \
+            --exclude "mf-manifest.json" \
+            --exclude "mf-stats.json" \
             --cache-control "public, max-age=31536000, immutable"
 
       - name: Upload remoteEntry.js (no-cache)
@@ -56,8 +58,17 @@ jobs:
             --cache-control "no-cache" \
             --content-type "application/javascript"
 
-      - name: Invalidate CloudFront (remoteEntry.js only)
+      # mf-manifest.json: shell이 /learn 첫 진입 때 읽어 MF 체인 파일을 미리 받는다(강의실 성능 P3 ③).
+      # 해시가 바뀐 청크 목록이라 낡으면 옛 파일을 미리 받게 되므로 remoteEntry처럼 no-cache.
+      - name: Upload mf-manifest.json (no-cache)
+        run: |
+          aws s3 cp apps/learn/dist/mf-manifest.json \
+            s3://${{ secrets.S3_BUCKET }}/remotes/learn/mf-manifest.json \
+            --cache-control "no-cache" \
+            --content-type "application/json"
+
+      - name: Invalidate CloudFront (remoteEntry.js, mf-manifest.json)
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/remotes/learn/remoteEntry.js"
+            --paths "/remotes/learn/remoteEntry.js" "/remotes/learn/mf-manifest.json"
