@@ -7,7 +7,150 @@
         <!-- Pretendard는 자체 호스팅한다 (src/fonts/pretendard.css를 main.tsx가 렌더를 막지 않게 <link>로 붙인다) -->
     </head>
     <body>
+        <!--
+            화면 스켈레톤 (강의실 성능 P2, docs/plans/learn-performance.md)
+            - 정적: 아래 인라인 스크립트가 JS 번들보다 먼저 경로에 맞는 템플릿을 #root에 넣는다 (첫 화면을 HTML·CSS만으로 그림)
+            - 동적: shell 라우터가 learn remote를 받는 동안 같은 템플릿을 Suspense fallback으로 그린다 (app/Skeleton.tsx)
+            - 실제 화면 마크업(learn CourseListPage·CoursePage, shell LobbyPage)과 크기를 맞춰 둔다. 레이아웃을 바꾸면 함께 고칠 것
+            - button·h3·img를 쓰지 않는다: 측정 스크립트(perf/measure-learn.mjs)가 "main button h3"를 실제 카드, "main img"를 썸네일로 본다
+        -->
+        <template id="sk-learn">
+            <div class="min-h-screen bg-background flex flex-col" aria-busy="true">
+                <header class="bg-white border-b border-border px-6 h-14 flex items-center justify-between shrink-0">
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg bg-[#0071ff] flex items-center justify-center">
+                            <svg width="14" height="14" viewBox="0 0 22 22" fill="none"><path d="M4 5h14M4 11h14M4 17h8" stroke="white" stroke-width="2.2" stroke-linecap="round" /></svg>
+                        </div>
+                        <span class="text-[15px] font-bold text-text-primary">멘토링 플랫폼</span>
+                        <span class="text-text-disabled text-sm mx-0.5">/</span>
+                        <span class="text-[15px] text-text-secondary">강의실</span>
+                    </div>
+                </header>
+                <main class="flex-1 max-w-6xl w-full mx-auto px-6 py-8">
+                    <div class="mb-6">
+                        <h1 class="text-2xl font-bold text-text-primary">강의실</h1>
+                        <p class="text-sm text-text-secondary mt-1">원하는 강의를 선택하여 학습을 시작하세요</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mb-8">
+                        <div class="h-[34px] w-[58px] rounded-full bg-[#e9ecf1] animate-pulse"></div>
+                        <div class="h-[34px] w-[94px] rounded-full bg-[#e9ecf1] animate-pulse"></div>
+                        <div class="h-[34px] w-[80px] rounded-full bg-[#e9ecf1] animate-pulse"></div>
+                        <div class="h-[34px] w-[80px] rounded-full bg-[#e9ecf1] animate-pulse"></div>
+                        <div class="h-[34px] w-[92px] rounded-full bg-[#e9ecf1] animate-pulse"></div>
+                        <div class="h-[34px] w-[76px] rounded-full bg-[#e9ecf1] animate-pulse"></div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                        <div class="bg-white rounded-2xl border border-border overflow-hidden">
+                            <div class="h-36 bg-[#eef1f5] animate-pulse"></div>
+                            <div class="p-5">
+                                <div class="flex justify-between mb-3"><div class="h-5 w-14 rounded-full bg-[#f0f2f5]"></div><div class="h-5 w-11 rounded-full bg-[#f0f2f5]"></div></div>
+                                <div class="h-[22px] w-2/3 rounded bg-[#f0f2f5] mb-1"></div>
+                                <div class="h-[42px] rounded bg-[#f5f6f8] mb-4"></div>
+                                <div class="h-[18px] w-1/3 rounded bg-[#f5f6f8] mb-1.5"></div>
+                                <div class="h-1.5 rounded-full bg-[#f0f0f0]"></div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-2xl border border-border overflow-hidden">
+                            <div class="h-36 bg-[#eef1f5] animate-pulse"></div>
+                            <div class="p-5">
+                                <div class="flex justify-between mb-3"><div class="h-5 w-14 rounded-full bg-[#f0f2f5]"></div><div class="h-5 w-11 rounded-full bg-[#f0f2f5]"></div></div>
+                                <div class="h-[22px] w-2/3 rounded bg-[#f0f2f5] mb-1"></div>
+                                <div class="h-[42px] rounded bg-[#f5f6f8] mb-4"></div>
+                                <div class="h-[18px] w-1/3 rounded bg-[#f5f6f8] mb-1.5"></div>
+                                <div class="h-1.5 rounded-full bg-[#f0f0f0]"></div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-2xl border border-border overflow-hidden">
+                            <div class="h-36 bg-[#eef1f5] animate-pulse"></div>
+                            <div class="p-5">
+                                <div class="flex justify-between mb-3"><div class="h-5 w-14 rounded-full bg-[#f0f2f5]"></div><div class="h-5 w-11 rounded-full bg-[#f0f2f5]"></div></div>
+                                <div class="h-[22px] w-2/3 rounded bg-[#f0f2f5] mb-1"></div>
+                                <div class="h-[42px] rounded bg-[#f5f6f8] mb-4"></div>
+                                <div class="h-[18px] w-1/3 rounded bg-[#f5f6f8] mb-1.5"></div>
+                                <div class="h-1.5 rounded-full bg-[#f0f0f0]"></div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </template>
+        <template id="sk-course">
+            <div class="h-screen flex flex-col bg-background overflow-hidden" aria-busy="true">
+                <header class="bg-white border-b border-border px-6 h-14 flex items-center justify-between shrink-0">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <div class="w-7 h-7 rounded-lg bg-[#0071ff] flex items-center justify-center shrink-0">
+                            <svg width="14" height="14" viewBox="0 0 22 22" fill="none"><path d="M4 5h14M4 11h14M4 17h8" stroke="white" stroke-width="2.2" stroke-linecap="round" /></svg>
+                        </div>
+                        <span class="text-[15px] font-bold text-text-primary shrink-0">멘토링 플랫폼</span>
+                        <span class="text-text-disabled text-sm mx-0.5 shrink-0">/</span>
+                        <span class="text-[15px] text-text-secondary shrink-0">강의실</span>
+                    </div>
+                </header>
+                <div class="flex-1 flex overflow-hidden">
+                    <div class="flex-1 flex flex-col overflow-y-auto min-w-0">
+                        <div class="bg-black w-full aspect-video"></div>
+                        <div class="px-8 py-6">
+                            <div class="h-7 w-1/2 rounded bg-[#e9ecf1] animate-pulse mb-5"></div>
+                            <div class="flex gap-2 border-b border-border mb-6 pb-2.5">
+                                <div class="h-5 w-16 rounded bg-[#f0f2f5]"></div>
+                                <div class="h-5 w-16 rounded bg-[#f0f2f5]"></div>
+                            </div>
+                            <div class="h-4 w-3/4 rounded bg-[#f5f6f8] mb-2"></div>
+                            <div class="h-4 w-2/3 rounded bg-[#f5f6f8]"></div>
+                        </div>
+                    </div>
+                    <div class="w-80 border-l border-border bg-white flex flex-col shrink-0">
+                        <div class="px-5 py-4 border-b border-border shrink-0">
+                            <div class="h-[18px] w-2/3 rounded bg-[#f0f2f5] mb-3"></div>
+                            <div class="h-[18px] w-1/3 rounded bg-[#f5f6f8] mb-1.5"></div>
+                            <div class="h-1.5 rounded-full bg-[#f0f0f0]"></div>
+                        </div>
+                        <div class="px-5 py-3.5 flex gap-3"><div class="w-5 h-5 rounded-full bg-[#f0f2f5] shrink-0"></div><div class="flex-1 h-[52px] rounded bg-[#f5f6f8] animate-pulse"></div></div>
+                        <div class="px-5 py-3.5 flex gap-3"><div class="w-5 h-5 rounded-full bg-[#f0f2f5] shrink-0"></div><div class="flex-1 h-[52px] rounded bg-[#f5f6f8] animate-pulse"></div></div>
+                        <div class="px-5 py-3.5 flex gap-3"><div class="w-5 h-5 rounded-full bg-[#f0f2f5] shrink-0"></div><div class="flex-1 h-[52px] rounded bg-[#f5f6f8] animate-pulse"></div></div>
+                    </div>
+                </div>
+            </div>
+        </template>
+        <template id="sk-lobby">
+            <div class="min-h-screen bg-background flex flex-col" aria-busy="true">
+                <header class="bg-white border-b border-border px-6 h-14 flex items-center justify-between shrink-0">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-7 h-7 rounded-lg bg-[#0071ff] flex items-center justify-center">
+                            <svg width="14" height="14" viewBox="0 0 22 22" fill="none"><path d="M4 5h14M4 11h14M4 17h8" stroke="white" stroke-width="2.2" stroke-linecap="round" /></svg>
+                        </div>
+                        <span class="text-[15px] font-bold text-text-primary">멘토링 플랫폼</span>
+                    </div>
+                </header>
+                <main class="flex-1 max-w-5xl w-full mx-auto px-6 py-8">
+                    <div class="mb-6">
+                        <h2 class="text-xl font-bold text-text-primary">입장 가능한 공간</h2>
+                        <p class="text-sm text-text-secondary mt-1">공간을 선택하면 바로 입장합니다</p>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div class="bg-white rounded-2xl border border-border p-5"><div class="flex items-start justify-between mb-4"><div class="w-10 h-10 rounded-xl bg-[#eef1f5] animate-pulse"></div><div class="h-5 w-10 rounded-full bg-[#f0f2f5]"></div></div><div class="h-6 w-1/2 rounded bg-[#f0f2f5] mb-1"></div><div class="h-5 w-1/3 rounded bg-[#f5f6f8]"></div></div>
+                        <div class="bg-white rounded-2xl border border-border p-5"><div class="flex items-start justify-between mb-4"><div class="w-10 h-10 rounded-xl bg-[#eef1f5] animate-pulse"></div><div class="h-5 w-10 rounded-full bg-[#f0f2f5]"></div></div><div class="h-6 w-1/2 rounded bg-[#f0f2f5] mb-1"></div><div class="h-5 w-1/3 rounded bg-[#f5f6f8]"></div></div>
+                        <div class="bg-white rounded-2xl border border-border p-5"><div class="flex items-start justify-between mb-4"><div class="w-10 h-10 rounded-xl bg-[#eef1f5] animate-pulse"></div><div class="h-5 w-10 rounded-full bg-[#f0f2f5]"></div></div><div class="h-6 w-1/2 rounded bg-[#f0f2f5] mb-1"></div><div class="h-5 w-1/3 rounded bg-[#f5f6f8]"></div></div>
+                    </div>
+                </main>
+            </div>
+        </template>
         <div id="root"></div>
+        <script>
+            // 정적 스켈레톤: 로그인 상태에서 /learn, /learn/:id, /lobby로 들어오면 JS 번들보다 먼저 뼈대를 그린다.
+            // React가 첫 렌더 때 #root 내용을 갈아끼운다. 그 외 경로는 지금처럼 비워 둔다.
+            (function () {
+                try {
+                    if (!localStorage.getItem("auth_token")) return;
+                    var p = location.pathname.replace(/\/+$/, "");
+                    var id = p === "/learn" ? "sk-learn" : /^\/learn\/[^/]+$/.test(p) ? "sk-course" : p === "/lobby" ? "sk-lobby" : null;
+                    var t = id && document.getElementById(id);
+                    if (t) document.getElementById("root").innerHTML = t.innerHTML;
+                } catch (e) {
+                    /* 스켈레톤은 없어도 된다 */
+                }
+            })();
+        </script>
         <script type="module" src="/src/main.tsx"></script>
     </body>
 </html>

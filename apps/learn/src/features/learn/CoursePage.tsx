@@ -166,13 +166,8 @@ export function CoursePage() {
         }
     }, [courseId]);
 
-    if (loading) {
-        return (
-            <div className="h-screen flex items-center justify-center bg-background">
-                <div className="w-8 h-8 border-2 border-[#0071ff] border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
-    }
+    // 로딩 중에도 헤더·레이아웃을 먼저 그리고 데이터 자리만 스켈레톤으로 둔다 (P2. 테두리 스피너는 FCP로 집계되지 않는다)
+    if (loading) return <CoursePageSkeleton onBack={() => navigate("..")} />;
     if (!course) return null;
 
     const currentLesson = course.lessons.find((l) => l.id === currentLessonId);
@@ -377,6 +372,69 @@ export function CoursePage() {
                             );
                         })}
                     </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/** 강의 상세 로딩 화면 — shell index.html의 sk-course와 같은 모양 */
+function CoursePageSkeleton({ onBack }: { onBack: () => void }) {
+    return (
+        <div className="h-screen flex flex-col bg-background overflow-hidden" aria-busy="true">
+            <header className="bg-white border-b border-border px-6 h-14 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-[#0071ff] flex items-center justify-center shrink-0">
+                        <svg width="14" height="14" viewBox="0 0 22 22" fill="none">
+                            <path d="M4 5h14M4 11h14M4 17h8" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+                        </svg>
+                    </div>
+                    <span className="text-[15px] font-bold text-text-primary shrink-0">멘토링 플랫폼</span>
+                    <span className="text-text-disabled text-sm mx-0.5 shrink-0">/</span>
+                    <button
+                        type="button"
+                        onClick={onBack}
+                        className="text-[15px] text-text-secondary hover:text-text-primary transition-colors shrink-0"
+                    >
+                        강의실
+                    </button>
+                </div>
+                <button
+                    type="button"
+                    onClick={onBack}
+                    className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors shrink-0 ml-4"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    강의 목록
+                </button>
+            </header>
+            <div className="flex-1 flex overflow-hidden">
+                <div className="flex-1 flex flex-col overflow-y-auto min-w-0">
+                    <div className="bg-black w-full aspect-video" />
+                    <div className="px-8 py-6">
+                        <div className="h-7 w-1/2 rounded bg-[#e9ecf1] animate-pulse mb-5" />
+                        <div className="flex gap-2 border-b border-border mb-6 pb-2.5">
+                            <div className="h-5 w-16 rounded bg-[#f0f2f5]" />
+                            <div className="h-5 w-16 rounded bg-[#f0f2f5]" />
+                        </div>
+                        <div className="h-4 w-3/4 rounded bg-[#f5f6f8] mb-2" />
+                        <div className="h-4 w-2/3 rounded bg-[#f5f6f8]" />
+                    </div>
+                </div>
+                <div className="w-80 border-l border-border bg-white flex flex-col shrink-0">
+                    <div className="px-5 py-4 border-b border-border shrink-0">
+                        <div className="h-[18px] w-2/3 rounded bg-[#f0f2f5] mb-3" />
+                        <div className="h-[18px] w-1/3 rounded bg-[#f5f6f8] mb-1.5" />
+                        <div className="h-1.5 rounded-full bg-[#f0f0f0]" />
+                    </div>
+                    {[0, 1, 2].map((i) => (
+                        <div key={i} className="px-5 py-3.5 flex gap-3">
+                            <div className="w-5 h-5 rounded-full bg-[#f0f2f5] shrink-0" />
+                            <div className="flex-1 h-[52px] rounded bg-[#f5f6f8] animate-pulse" />
+                        </div>
+                    ))}
                 </div>
             </div>
         </div>

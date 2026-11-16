@@ -84,10 +84,12 @@ export function CourseListPage() {
                     ))}
                 </div>
 
-                {/* Loading */}
+                {/* Loading: 카드 자리 스켈레톤 (shell index.html의 sk-learn과 같은 모양). button·h3·img는 쓰지 않는다 — 측정 스크립트가 실제 카드로 오인 */}
                 {loading ? (
-                    <div className="flex justify-center py-24">
-                        <div className="w-8 h-8 border-2 border-[#0071ff] border-t-transparent rounded-full animate-spin" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5" aria-busy="true">
+                        {[0, 1, 2].map((i) => (
+                            <CourseCardSkeleton key={i} />
+                        ))}
                     </div>
                 ) : courses.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -111,6 +113,24 @@ export function CourseListPage() {
                     </div>
                 )}
             </main>
+        </div>
+    );
+}
+
+function CourseCardSkeleton() {
+    return (
+        <div className="bg-white rounded-2xl border border-border overflow-hidden">
+            <div className="h-36 bg-[#eef1f5] animate-pulse" />
+            <div className="p-5">
+                <div className="flex justify-between mb-3">
+                    <div className="h-5 w-14 rounded-full bg-[#f0f2f5]" />
+                    <div className="h-5 w-11 rounded-full bg-[#f0f2f5]" />
+                </div>
+                <div className="h-[22px] w-2/3 rounded bg-[#f0f2f5] mb-1" />
+                <div className="h-[42px] rounded bg-[#f5f6f8] mb-4" />
+                <div className="h-[18px] w-1/3 rounded bg-[#f5f6f8] mb-1.5" />
+                <div className="h-1.5 rounded-full bg-[#f0f0f0]" />
+            </div>
         </div>
     );
 }

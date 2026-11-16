@@ -89,9 +89,19 @@ export function LobbyPage() {
                     <p className="text-sm text-text-secondary mt-1">공간을 선택하면 바로 입장합니다</p>
                 </div>
 
+                {/* 로딩 중: 카드 자리 스켈레톤 (index.html의 sk-lobby와 같은 모양 — 정적 뼈대에서 바뀌지 않게) */}
                 {loading && (
-                    <div className="flex justify-center py-16">
-                        <span className="w-6 h-6 border-2 border-border border-t-[#0071ff] rounded-full animate-spin" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" aria-busy="true">
+                        {[0, 1, 2].map((i) => (
+                            <div key={i} className="bg-white rounded-2xl border border-border p-5">
+                                <div className="flex items-start justify-between mb-4">
+                                    <div className="w-10 h-10 rounded-xl bg-[#eef1f5] animate-pulse" />
+                                    <div className="h-5 w-10 rounded-full bg-[#f0f2f5]" />
+                                </div>
+                                <div className="h-6 w-1/2 rounded bg-[#f0f2f5] mb-1" />
+                                <div className="h-5 w-1/3 rounded bg-[#f5f6f8]" />
+                            </div>
+                        ))}
                     </div>
                 )}
 
