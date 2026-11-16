@@ -7,10 +7,12 @@ import { LobbyPage } from "../features/lobby/LobbyPage";
 import { AdminPage } from "../features/admin/AdminPage";
 import { trackRemoteLoad } from "../monitoring";
 import { LearnSkeleton } from "./Skeleton";
+import { loadLearnApp } from "./remotes";
 
 // remote 로드를 Sentry 스팬으로 감싼다 (트랜잭션 유지 + remote 로드 시간 측정, monitoring.ts 참고)
+// learn은 로비에서 미리 받을 수 있어 같은 로더를 공유한다 (remotes.ts)
 const RoomApp = lazy(() => trackRemoteLoad("room", () => import("room/App")));
-const LearnApp = lazy(() => trackRemoteLoad("learn", () => import("learn/App")));
+const LearnApp = lazy(() => trackRemoteLoad("learn", loadLearnApp));
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
     const hydrated = useAuthStore((s) => s._hasHydrated);

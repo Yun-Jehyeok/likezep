@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { createApiClient, useAuthStore } from "@mentoring/ui";
+import { preloadLearn, schedulePreloadLearn } from "../../app/remotes";
 
 const api = createApiClient(import.meta.env.VITE_API_URL);
 
@@ -44,6 +45,12 @@ export function LobbyPage() {
         return () => clearInterval(interval);
     }, []);
 
+    // 룸 목록이 그려진 뒤 브라우저가 한가할 때 강의실(learn remote)을 미리 받는다 (P3b, app/remotes.ts)
+    useEffect(() => {
+        if (loading) return;
+        return schedulePreloadLearn();
+    }, [loading]);
+
     function handleLogout() {
         clearAuth();
         navigate("/login");
@@ -63,9 +70,16 @@ export function LobbyPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <div className="text-sm text-text-primary font-medium cursor-pointer" onClick={() => navigate("/learn")}>
+                    {/* 링크라서 키보드로 이동할 수 있고, 마우스 올림·포커스 때 강의실을 미리 받는다 (P3b·P3e) */}
+                    <Link
+                        to="/learn"
+                        onMouseEnter={preloadLearn}
+                        onFocus={preloadLearn}
+                        onTouchStart={preloadLearn}
+                        className="text-sm text-text-primary font-medium hover:text-[#0071ff] transition-colors"
+                    >
                         강의실
-                    </div>
+                    </Link>
                     {user?.role === "admin" && (
                         <button type="button" onClick={() => navigate("/admin")} className="text-sm text-[#0071ff] font-medium hover:text-primary-hover transition-colors cursor-pointer">
                             관리 대시보드
