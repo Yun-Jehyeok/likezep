@@ -3,10 +3,10 @@ import "./index.css";
 import { App } from "./App";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { ErrorBoundary } from "./app/ErrorBoundary";
-import { loadSentry } from "./monitoring";
+import { scheduleSentry } from "./monitoring";
 
-// Sentry SDK는 별도 청크로 받아 렌더와 병렬로 초기화한다 (첫 화면을 막지 않음, sentry.ts 참고)
-void loadSentry();
+// Sentry SDK는 첫 화면이 그려진 뒤에 받는다 (에러가 나면 즉시). 이유는 monitoring.ts·sentry.ts 참고
+scheduleSentry();
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
 

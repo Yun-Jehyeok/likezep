@@ -57,6 +57,10 @@ const DEVICE = {
 };
 // settle 판정에서 제외할 요청 (Google 로그인 SDK의 백그라운드 요청)
 const IGNORE_PENDING = /accounts\.google\.com|play\.google\.com|gstatic\.com|googleapis\.com/;
+// 측정 트래픽이 프로덕션 Sentry 실사용자 지표(environment=production)에 섞이지 않도록 이벤트 전송만 막는다.
+// SDK 청크 다운로드는 막지 않는다 — 실제 사용자와 같은 로드 비용을 재야 한다.
+// Playwright route()는 HTTP 캐시를 꺼 버려 warm/nav-cached 측정을 망치므로 CDP 차단을 쓴다.
+const BLOCKED_URLS = ["*ingest*sentry.io*"];
 const ALL_STATES = ["cold", "warm", "nav-first", "nav-early", "nav-cached"];
 
 // ─── 인자 ───
@@ -167,6 +171,7 @@ function initScript() {
 async function instrument(page, { throttle }) {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send("Network.enable");
+    await cdp.send("Network.setBlockedURLs", { urls: BLOCKED_URLS });
     await cdp.send("DOM.enable");
     await cdp.send("CSS.enable");
     await cdp.send("CSS.setLocalFontsEnabled", { enabled: LOCAL_FONTS });
@@ -535,6 +540,7 @@ async function main() {
         runs: RUNS,
         states: STATES,
         localFonts: LOCAL_FONTS,
+        blockedUrls: BLOCKED_URLS,
         network: NETWORK,
         cpuRate: CPU_RATE,
         device: { ...DEVICE, userAgent: undefined },

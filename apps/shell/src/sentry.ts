@@ -1,10 +1,12 @@
 /**
  * 클라이언트 Sentry 초기화 — MF host(shell)에서 한 번만 한다.
  *
- * ⚠️ 이 파일은 직접 import하지 말고 `./monitoring`의 loadSentry()로만 불러온다.
+ * ⚠️ 이 파일은 직접 import하지 말고 `./monitoring`을 통해서만 불러온다.
  * SDK가 gzip 약 52KB라 정적으로 넣으면 모든 화면의 첫 로드 경로가 그만큼 무거워진다.
- * 동적 import로 별도 청크를 만들어 첫 렌더를 막지 않게 한다. LCP/FCP 등은 브라우저가
- * buffered로 보관하므로 초기화가 조금 늦어도 pageload 지표는 그대로 수집된다.
+ * 별도 청크로 빼고, 받는 시점도 첫 화면 이후로 미룬다(monitoring.ts의 scheduleSentry).
+ * 바로 받아 실행했더니 MF remote 로딩 한가운데서 CPU를 잡아 강의실 LCP가 늦어졌다
+ * (docs/plans/learn-performance.md §2.0). LCP/FCP 등은 브라우저가 buffered로 보관하므로
+ * 초기화가 늦어도 pageload 지표는 수집된다.
  *
  * shell/room/learn은 같은 window에서 돌기 때문에 여기서 만든 클라이언트를 remote도 함께 쓴다.
  * @sentry/* 는 SDK 버전별 전역 저장소(globalThis.__SENTRY__[버전])를 쓰므로, room이 따로 번들한
@@ -67,6 +69,10 @@ export function initSentry(): void {
                     },
                 }),
                 ignoreResourceSpans: IGNORED_RESOURCE_SPANS,
+                // SDK가 첫 화면 이후에 초기화되므로(monitoring.ts) pageload 스팬도 늦게 시작한다.
+                // 기본 1초 idle이면 썸네일(LCP)이 뜨기 전에 끝나 LCP가 틀리게 잡히므로 여유를 둔다.
+                // 스팬 끝은 마지막 자식 스팬 시점으로 잘리므로 duration이 5초씩 부풀지는 않는다.
+                idleTimeout: 5000,
             }),
         ],
         tracesSampler: ({ name }) => (isTracedRoute(name) ? 1 : 0),
@@ -82,12 +88,22 @@ export function initSentry(): void {
  * @param startTimeMs 실제 로드 시작 시각(epoch ms) — SDK가 늦게 와도 시작 시점을 맞추기 위함
  */
 export function startRemoteLoadSpan(remote: string, startTimeMs: number): () => void {
-    const span = Sentry.startInactiveSpan({
-        name: `remote ${remote}`,
-        op: "mf.remote.load",
-        startTime: startTimeMs / 1000,
-    });
+    const span = startRemoteLoadSpanAt(remote, startTimeMs);
     return () => span.end();
+}
+
+/** SDK가 오기 전에 끝난 remote 로드를 측정해 둔 시각으로 소급 기록한다 (첫 진입 pageload의 자식이 된다) */
+export function recordRemoteLoadSpan(remote: string, startTimeMs: number, endTimeMs: number): void {
+    startRemoteLoadSpanAt(remote, startTimeMs).end(endTimeMs / 1000);
+}
+
+function startRemoteLoadSpanAt(remote: string, startTimeMs: number) {
+    return Sentry.startInactiveSpan({ name: `remote ${remote}`, op: "mf.remote.load", startTime: startTimeMs / 1000 });
+}
+
+/** SDK 초기화 전에 발생해 monitoring.ts가 버퍼에 담아 둔 에러를 전송한다 */
+export function captureEarlyError(error: unknown): void {
+    Sentry.captureException(error, { tags: { captured_before_init: "true" } });
 }
 
 /** ErrorBoundary가 잡은 렌더 에러 전송 (React 컴포넌트 스택 포함) */
