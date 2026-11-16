@@ -25,6 +25,8 @@
  *   --local-fonts     로컬 설치 폰트 허용. 기본은 차단한다(개발 PC에 Pretendard가 설치돼 있어 폰트 비용이 0으로 보이는 착시 방지)
  *   --headed          브라우저 창 표시 (디버깅용)
  *   --channel <name>  브라우저 채널 (기본 chromium). Google이 로그인을 막으면 --login --channel chrome
+ *   --block <list>    추가로 차단할 URL 패턴 (CDP 와일드카드, 콤마 구분). A/B 실험용
+ *                     예) --block "*\/assets/sentry-*"  → Sentry SDK를 뺀 상태를 같은 시간대에 비교
  *
  * 결과: perf/results/<YYYYMMDD-HHmm>-<label>.json + .md
  *   - URL의 쿼리스트링(presigned 서명·보안 토큰)은 저장하지 않는다.
@@ -32,6 +34,7 @@
  */
 import { chromium } from "@playwright/test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpus } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -60,7 +63,7 @@ const IGNORE_PENDING = /accounts\.google\.com|play\.google\.com|gstatic\.com|goo
 // 측정 트래픽이 프로덕션 Sentry 실사용자 지표(environment=production)에 섞이지 않도록 이벤트 전송만 막는다.
 // SDK 청크 다운로드는 막지 않는다 — 실제 사용자와 같은 로드 비용을 재야 한다.
 // Playwright route()는 HTTP 캐시를 꺼 버려 warm/nav-cached 측정을 망치므로 CDP 차단을 쓴다.
-const BLOCKED_URLS = ["*ingest*sentry.io*"];
+const DEFAULT_BLOCKED_URLS = ["*ingest*sentry.io*"];
 const ALL_STATES = ["cold", "warm", "nav-first", "nav-early", "nav-cached"];
 
 // ─── 인자 ───
@@ -75,8 +78,10 @@ const { values: args } = parseArgs({
         headed: { type: "boolean", default: false },
         channel: { type: "string", default: "chromium" },
         login: { type: "boolean", default: false },
+        block: { type: "string", default: "" },
     },
 });
+const BLOCKED_URLS = [...DEFAULT_BLOCKED_URLS, ...args.block.split(",").map((s) => s.trim()).filter(Boolean)];
 const BASE = args.base.replace(/\/$/, "");
 const BASE_ORIGIN = new URL(BASE).origin;
 const AUTH_FILE = join(HERE, ".auth", `${new URL(BASE).host}.json`);
@@ -502,6 +507,8 @@ function markdown(meta, summary) {
         `- 조건: latency ${NETWORK.latency}ms, down ${(NETWORK.downloadThroughput * 8 / 1024).toFixed(0)}Kbps, CPU ${CPU_RATE}x, ${DEVICE.viewport.width}×${DEVICE.viewport.height} @${DEVICE.deviceScaleFactor}x, 로컬 폰트 ${LOCAL_FONTS ? "허용" : "차단"}`,
         `- 반복: 상태별 ${meta.runs}회, 중앙값 (최소–최대)`,
         `- 브라우저: ${meta.browser}`,
+        `- 측정 PC CPU 사용률(측정 기간 평균, 측정 브라우저 포함): ${meta.hostCpuBusyPct ?? "-"}%`,
+        ...(meta.blockedUrls?.length ? [`- 차단 URL: ${meta.blockedUrls.join(", ")}`] : []),
         "",
     ];
     for (const state of STATES) {
@@ -516,6 +523,24 @@ function markdown(meta, summary) {
         lines.push("");
     }
     return lines.join("\n");
+}
+
+/**
+ * 측정 PC의 CPU 사용률(%) — 측정 기간 동안 전체 코어 평균. 측정 브라우저 자신의 사용분도 포함된다.
+ * CPU 감속(4x)은 PC 성능에 비례해 걸리므로, 다른 무거운 작업이 돌면 long task·FCP가 흔들린다.
+ * 2026-11-16 밤 baseline과 낮 측정을 비교했다가 환경 차이를 개선/회귀로 착각할 뻔했다 → 결과에 남긴다.
+ */
+function cpuSnapshot() {
+    return cpus().reduce((a, c) => {
+        const t = c.times;
+        a.busy += t.user + t.nice + t.sys + t.irq;
+        a.total += t.user + t.nice + t.sys + t.irq + t.idle;
+        return a;
+    }, { busy: 0, total: 0 });
+}
+function cpuBusyPct(from, to) {
+    const total = to.total - from.total;
+    return total > 0 ? Math.round(((to.busy - from.busy) / total) * 1000) / 10 : null;
 }
 
 function stamp(d) {
@@ -549,6 +574,7 @@ async function main() {
     console.log(`측정: ${STATES.join(", ")} × ${RUNS}회 (${meta.browser}, 로컬 폰트 ${LOCAL_FONTS ? "허용" : "차단"})`);
 
     const results = [];
+    const cpuStart = cpuSnapshot();
     try {
         // 상태를 번갈아 돌린다 — 시간대별 네트워크 변동이 특정 상태에 몰리지 않게
         for (let run = 1; run <= RUNS; run++) {
@@ -571,9 +597,11 @@ async function main() {
     } finally {
         await browser.close();
     }
+    meta.hostCpuBusyPct = cpuBusyPct(cpuStart, cpuSnapshot());
 
     const summary = summarize(results);
     printSummary(summary);
+    console.log(`\n측정 PC CPU 사용률(측정 기간 평균, 측정 브라우저 포함): ${meta.hostCpuBusyPct}%`);
 
     const resultsDir = join(HERE, "results");
     mkdirSync(resultsDir, { recursive: true });
