@@ -152,14 +152,21 @@ function checkAuthFile() {
 
 // ─── 페이지 계측 ───
 
-/** 페이지 로드 전에 주입: LCP·long task 수집 */
+/** 페이지 로드 전에 주입: LCP·long task·실제 카드 표시 시점 수집 */
 function initScript() {
     const describe = (el) => {
         if (!el) return null;
         const text = el.textContent?.trim();
         return el.tagName.toLowerCase() + (text ? ` "${text.slice(0, 20)}"` : "");
     };
-    window.__perf = { lcp: [], longTasks: [] };
+    window.__perf = { lcp: [], longTasks: [], cardsAt: null };
+    // 실제 강의 카드(main button h3)가 처음 그려진 시점. 스켈레톤(P2)이 들어가면 FCP는 뼈대 시점이 되므로
+    // "실제 콘텐츠가 보인 시점"을 따로 잰다. 스켈레톤은 button·h3·img를 쓰지 않는다 (navProbe와 같은 기준)
+    const watchCards = () => {
+        if (document.querySelector("main button h3")) window.__perf.cardsAt = performance.now();
+        else if (performance.now() < 60_000) requestAnimationFrame(watchCards);
+    };
+    requestAnimationFrame(watchCards);
     try {
         new PerformanceObserver((l) => {
             for (const e of l.getEntries()) window.__perf.lcp.push({ t: e.startTime, size: e.size, el: describe(e.element), url: e.url || null });
@@ -279,6 +286,7 @@ async function collectLoad(page, tracker) {
             lcp: window.__perf.lcp.at(-1) ?? null,
             longTaskTotal: window.__perf.longTasks.reduce((a, [, d]) => a + d, 0),
             cardCount: document.querySelectorAll("main button h3").length,
+            cardsAt: window.__perf.cardsAt,
         };
     });
     const reqs = tracker.list().map((r) => ({ ...r, start: r.start - p.timeOrigin, end: r.end == null ? null : r.end - p.timeOrigin }));
@@ -290,6 +298,7 @@ async function collectLoad(page, tracker) {
         lcpUrl: cleanUrl(p.lcp?.url) || null,
         longTaskTotal: p.longTaskTotal,
         cardCount: p.cardCount,
+        cardsAt: p.cardsAt,
         ...summarizeRequests(reqs),
         waterfall: waterfall(reqs),
     };
@@ -442,6 +451,7 @@ const LOAD_METRICS = [
     ["ttfb", "TTFB", "ms"],
     ["fcp", "FCP", "ms"],
     ["lcp", "LCP", "ms"],
+    ["cardsAt", "실제 카드 표시", "ms"],
     ["apiStart", "/api/courses 요청 시작", "ms"],
     ["fontsDone", "폰트 다운로드 완료", "ms"],
     ["transferKB", "총 전송량", "KB"],
