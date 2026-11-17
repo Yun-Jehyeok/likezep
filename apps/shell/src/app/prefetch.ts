@@ -12,13 +12,16 @@ import { createApiClient } from "@mentoring/ui";
  * - learn은 한 번 꺼내면 지운다. 없거나 오래됐거나 실패했으면 직접 요청한다
  * - @mentoring/ui(shared)에 넣지 않은 이유: shell·learn 배포 순서가 어긋나도 깨지지 않게 (없으면 그냥 직접 요청)
  *
- * /learn 하드 내비게이션(첫 진입·재방문)은 index.html <head> 인라인 스크립트가 HTML 단계에서 같은 항목을 먼저 등록한다
- * (§5.1 ①). 그 경우 아래 prefetchApi는 DEDUPE_MS 안이라 건너뛰고, 썸네일도 인라인 스크립트가 받는다.
- * 여기는 로비 → 강의실 같은 SPA 이동을 맡는다. 요청 모양·썸네일 어림을 바꾸면 인라인 스크립트도 같이 고칠 것.
+ * /learn·/lobby 하드 내비게이션은 index.html <head> 인라인 스크립트가 HTML 단계에서 같은 항목을 먼저 등록한다
+ * (§5.1 ①·③). 그 경우 아래 prefetchApi는 DEDUPE_MS 안이라 건너뛰고, 썸네일도 인라인 스크립트가 받는다.
+ * 여기는 SPA로 로비·강의실에 오는 경우와 로비에서 오래 머문 뒤 이동하는 경우를 맡는다.
+ * 요청 모양·썸네일 어림을 바꾸면 인라인 스크립트도 같이 고칠 것.
  */
 export interface PrefetchEntry {
     at: number;
     promise: Promise<unknown>;
+    /** 실패한 요청은 중복 방지에서 빼고 다시 요청한다 */
+    failed?: boolean;
 }
 
 declare global {
@@ -29,8 +32,14 @@ declare global {
 
 const api = createApiClient(import.meta.env.VITE_API_URL);
 
-/** 같은 경로를 이 시간 안에 다시 부르면 새로 요청하지 않는다 */
-const DEDUPE_MS = 10_000;
+/**
+ * 같은 경로를 이 시간 안에 다시 부르면 새로 요청하지 않고 앞의 요청을 쓴다.
+ * learn이 받아 쓰는 최대 시간(apps/learn/src/prefetch.ts MAX_AGE_MS 30초)보다 짧아야 한다 —
+ * 같거나 길면 "shell은 새로 안 보냈는데 learn은 오래됐다고 버리는" 구간이 생긴다.
+ * 25초: 로비에서 강의실을 미리 받은 뒤(§5.1 ③) 25초 안에 누르면 그 응답을 그대로 쓴다.
+ * 최대 25초 전 목록이 보일 수 있다(완료 표시는 강의실에서 바뀌므로 로비 체류 중에는 바뀌지 않음).
+ */
+const DEDUPE_MS = 25_000;
 
 /**
  * @param onData 응답이 오면 바로 실행할 후속 작업 (예: 첫 화면 썸네일 미리 받기). 실패하면 실행하지 않는다
@@ -39,15 +48,26 @@ export function prefetchApi(path: string, onData?: (data: unknown) => void): voi
     if (!localStorage.getItem("auth_token")) return;
     const store = (window.__likezepPrefetch ??= {});
     const prev = store[path];
-    if (prev && Date.now() - prev.at < DEDUPE_MS) return;
+    if (prev && !prev.failed && Date.now() - prev.at < DEDUPE_MS) return;
     const promise = api.get<unknown>(path);
-    promise.catch(() => {}); // 꺼내 쓰지 않고 실패해도 unhandled rejection이 남지 않게
+    const entry: PrefetchEntry = { at: Date.now(), promise };
+    promise.catch(() => {
+        entry.failed = true; // 꺼내 쓰지 않고 실패해도 unhandled rejection이 남지 않게 + 다음 호출은 다시 요청
+    });
     if (onData) promise.then(onData, () => {});
-    store[path] = { at: Date.now(), promise };
+    store[path] = entry;
 }
 
 /** 강의 목록 화면(/learn)에 들어갈 때 쓰는 API — learn CourseListPage의 기본(전체 카테고리) 요청과 같아야 한다 */
 export const LEARN_LIST_API = "/api/courses";
+
+/**
+ * 강의 목록 API와 첫 화면 썸네일을 미리 받는다 (§5.1 ③).
+ * 로비 마운트(SPA로 로비에 온 경우)와 "강의실"에 마우스 올림·포커스 때 쓴다. 클릭 뒤 API 왕복·썸네일 왕복을 없앤다.
+ */
+export function prefetchLearnList(): void {
+    prefetchApi(LEARN_LIST_API, preloadListThumbnails);
+}
 
 /**
  * 강의 목록 응답이 오면 첫 화면에 보일 썸네일을 바로 받기 시작한다 (P3c 후속).
