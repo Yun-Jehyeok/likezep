@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createApiClient, useAuthStore } from "@mentoring/ui";
-import { preloadLearn, schedulePreloadLearn } from "../../app/remotes";
+import { isSaveData, preloadLearn, schedulePreloadLearn } from "../../app/remotes";
+import { prefetchLearnList } from "../../app/prefetch";
+
+/** "강의실"에 마우스 올림·포커스·터치 시작 — 클릭할 가능성이 높을 때 remote와 목록 데이터를 함께 미리 받는다 */
+function warmLearn() {
+    preloadLearn();
+    prefetchLearnList();
+}
 
 const api = createApiClient(import.meta.env.VITE_API_URL);
 
@@ -45,6 +52,13 @@ export function LobbyPage() {
         return () => clearInterval(interval);
     }, []);
 
+    // 강의실 목록 API·첫 화면 썸네일을 미리 받는다 (§5.1 ③, app/prefetch.ts). 하드 내비게이션이면 index.html 인라인
+    // 스크립트가 이미 보냈으므로 중복 방지로 건너뛰고, SPA로 로비에 온 경우(로그인 직후·룸에서 돌아옴)에 여기서 보낸다.
+    // 25초 안에 강의실을 누르면 클릭 뒤 API·썸네일 왕복이 없다. Save-Data면 하지 않는다(마우스 올림 때만)
+    useEffect(() => {
+        if (!isSaveData()) prefetchLearnList();
+    }, []);
+
     // 룸 목록이 그려진 뒤 브라우저가 한가할 때 강의실(learn remote)을 미리 받아 실행해 둔다 (P3b, app/remotes.ts)
     // 하드 내비게이션으로 /lobby에 들어왔으면 파일은 index.html 인라인 스크립트가 이미 받아 두었고(§5.1 ②), 여기서는 실행만 한다
     useEffect(() => {
@@ -71,12 +85,12 @@ export function LobbyPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    {/* 링크라서 키보드로 이동할 수 있고, 마우스 올림·포커스 때 강의실을 미리 받는다 (P3b·P3e) */}
+                    {/* 링크라서 키보드로 이동할 수 있고, 마우스 올림·포커스 때 강의실과 목록 데이터를 미리 받는다 (P3b·P3e·§5.1 ③) */}
                     <Link
                         to="/learn"
-                        onMouseEnter={preloadLearn}
-                        onFocus={preloadLearn}
-                        onTouchStart={preloadLearn}
+                        onMouseEnter={warmLearn}
+                        onFocus={warmLearn}
+                        onTouchStart={warmLearn}
                         className="text-sm text-text-primary font-medium hover:text-[#0071ff] transition-colors"
                     >
                         강의실

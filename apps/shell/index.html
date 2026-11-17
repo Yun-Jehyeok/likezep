@@ -6,10 +6,13 @@
         <title>멘토링 플랫폼</title>
         <!-- Pretendard는 자체 호스팅한다 (src/fonts/pretendard.css를 main.tsx가 렌더를 막지 않게 <link>로 붙인다) -->
         <script>
-            // 강의 목록 API·첫 화면 썸네일 선행 요청 — HTML 단계 (강의실 성능 §5.1 ①, docs/plans/learn-performance.md)
+            // 강의 목록 API·첫 화면 썸네일 선행 요청 — HTML 단계 (강의실 성능 §5.1 ①·③, docs/plans/learn-performance.md)
             // shell 첫 렌더(감속 cold 약 2.7s, warm 약 1.4s)를 기다리지 않고 HTML을 받자마자 /api/courses를 보낸다.
-            // - 계약은 apps/shell/src/app/prefetch.ts와 같다: window.__likezepPrefetch["/api/courses"] = { at, promise }
-            //   learn(apps/learn/src/prefetch.ts)이 꺼내 쓰고, shell prefetchApi는 10초 안 같은 경로면 다시 요청하지 않는다
+            // - /learn: 강의실 첫 진입·재방문 (①)
+            // - /lobby: 로비에서 강의실로 갈 때 클릭 뒤 API·썸네일 왕복을 없앤다 (③). 25초 안에 누르면 이 응답을 쓴다.
+            //   데이터 절약 모드(Save-Data)면 로비에서는 하지 않는다
+            // - 계약은 apps/shell/src/app/prefetch.ts와 같다: window.__likezepPrefetch["/api/courses"] = { at, promise, failed? }
+            //   learn(apps/learn/src/prefetch.ts)이 꺼내 쓰고, shell prefetchApi는 25초 안 같은 경로면 다시 요청하지 않는다
             // - 요청 모양(헤더·실패 처리)은 @mentoring/ui createApiClient와, 썸네일 장수 어림은 prefetch.ts preloadListThumbnails와 맞춘다
             //   (둘 중 하나를 바꾸면 여기도 고칠 것)
             // - API 주소는 빌드 때 Vite가 HTML의 env 자리표시자를 VITE_API_URL 값으로 바꾼다. 못 바꿨으면 건너뛴다
@@ -18,7 +21,9 @@
                 try {
                     var token = localStorage.getItem("auth_token");
                     if (!token) return;
-                    if (!/^\/learn\/?$/.test(location.pathname)) return;
+                    var onLobby = /^\/lobby\/?$/.test(location.pathname);
+                    if (!onLobby && !/^\/learn\/?$/.test(location.pathname)) return;
+                    if (onLobby && navigator.connection && navigator.connection.saveData) return;
                     var api = "%VITE_API_URL%";
                     if (!/^https?:\/\//.test(api)) return;
                     try {
@@ -36,8 +41,11 @@
                         if (!r.ok) throw new Error("prefetch " + r.status);
                         return r.json();
                     });
-                    promise.catch(function () {}); // 꺼내 쓰지 않고 실패해도 unhandled rejection이 남지 않게
-                    (window.__likezepPrefetch = window.__likezepPrefetch || {})[path] = { at: Date.now(), promise: promise };
+                    var entry = { at: Date.now(), promise: promise };
+                    promise.catch(function () {
+                        entry.failed = true; // unhandled rejection 방지 + shell prefetchApi가 중복 방지에서 빼고 다시 요청
+                    });
+                    (window.__likezepPrefetch = window.__likezepPrefetch || {})[path] = entry;
                     promise.then(function (list) {
                         if (!Array.isArray(list)) return;
                         // 첫 화면 카드 수 어림: learn CourseListPage grid-cols-1 / sm:2 / lg:3, 첫 줄 240px, 줄 간격 311px

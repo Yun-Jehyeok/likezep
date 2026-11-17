@@ -21,13 +21,17 @@ export function preloadLearn(): void {
     });
 }
 
+/** 데이터 절약 모드(Save-Data). 켜져 있으면 사용자 동작 없는 미리 받기는 하지 않는다 */
+export function isSaveData(): boolean {
+    return !!(navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
+}
+
 /**
  * 브라우저가 한가할 때 learn을 미리 받도록 예약한다. 반환값은 예약 취소 함수.
  * 데이터 절약 모드(Save-Data)면 예약하지 않는다 — 마우스 올림·포커스 때만 받는다.
  */
 export function schedulePreloadLearn(): () => void {
-    const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
-    if (saveData) return () => {};
+    if (isSaveData()) return () => {};
     if ("requestIdleCallback" in window) {
         const id = window.requestIdleCallback(preloadLearn, { timeout: 3000 });
         return () => window.cancelIdleCallback(id);
