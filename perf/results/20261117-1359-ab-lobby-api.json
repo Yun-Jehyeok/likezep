@@ -1,0 +1,460 @@
+{
+  "note": "§5.1 ③ 로비 강의 목록 API·썸네일 선행 요청 A/B. 프로덕션(like-zep.shop)에서 HTML만 CDP Fetch로 교체(A=원본, L=/lobby에도 첫 인라인 스크립트 적용). JS는 운영 그대로(중복 방지 10초)라 nav-first(로비 표시 8초 뒤 클릭)는 재사용 안 됨. 감속(Lighthouse mobile), 5회.",
+  "nav": {
+    "hostCpu": 14.2,
+    "results": {
+      "nav-first A": [
+        {
+          "blank": 0,
+          "header": 29,
+          "cards": 681,
+          "thumbs": 1324,
+          "cardCount": 20,
+          "afterReqs": 5,
+          "afterKB": 7,
+          "afterApi": 1,
+          "afterThumbNet": 1,
+          "cpu": 13.1
+        },
+        {
+          "blank": 0,
+          "header": 41,
+          "cards": 699,
+          "thumbs": 1308,
+          "cardCount": 20,
+          "afterReqs": 5,
+          "afterKB": 7,
+          "afterApi": 1,
+          "afterThumbNet": 1,
+          "cpu": 12.5
+        },
+        {
+          "blank": 0,
+          "header": 75,
+          "cards": 755,
+          "thumbs": 1377,
+          "cardCount": 20,
+          "afterReqs": 5,
+          "afterKB": 7,
+          "afterApi": 1,
+          "afterThumbNet": 1,
+          "cpu": 12.6
+        },
+        {
+          "blank": 0,
+          "header": 76,
+          "cards": 748,
+          "thumbs": 1362,
+          "cardCount": 20,
+          "afterReqs": 5,
+          "afterKB": 7,
+          "afterApi": 1,
+          "afterThumbNet": 1,
+          "cpu": 17.5
+        },
+        {
+          "blank": 0,
+          "header": 77,
+          "cards": 740,
+          "thumbs": 1329,
+          "cardCount": 20,
+          "afterReqs": 5,
+          "afterKB": 7,
+          "afterApi": 1,
+          "afterThumbNet": 1,
+          "cpu": 15.9
+        }
+      ],
+      "nav-first L": [
+        {
+          "blank": 0,
+          "header": 80,
+          "cards": 736,
+          "thumbs": 1304,
+          "cardCount": 20,
+          "afterReqs": 5,
+          "afterKB": 7,
+          "afterApi": 1,
+          "afterThumbNet": 1,
+          "cpu": 12.1
+        },
+        {
+          "blank": 0,
+          "header": 83,
+          "cards": 819,
+          "thumbs": 1332,
+          "cardCount": 20,
+          "afterReqs": 5,
+          "afterKB": 7,
+          "afterApi": 1,
+          "afterThumbNet": 1,
+          "cpu": 13.1
+        },
+        {
+          "blank": 0,
+          "header": 92,
+          "cards": 735,
+          "thumbs": 1343,
+          "cardCount": 20,
+          "afterReqs": 5,
+          "afterKB": 7,
+          "afterApi": 1,
+          "afterThumbNet": 1,
+          "cpu": 12.7
+        },
+        {
+          "blank": 0,
+          "header": 80,
+          "cards": 753,
+          "thumbs": 1326,
+          "cardCount": 20,
+          "afterReqs": 5,
+          "afterKB": 7,
+          "afterApi": 1,
+          "afterThumbNet": 1,
+          "cpu": 15.7
+        },
+        {
+          "blank": 0,
+          "header": 79,
+          "cards": 740,
+          "thumbs": 1328,
+          "cardCount": 20,
+          "afterReqs": 5,
+          "afterKB": 7,
+          "afterApi": 1,
+          "afterThumbNet": 1,
+          "cpu": 14.9
+        }
+      ],
+      "nav-early A": [
+        {
+          "blank": 0,
+          "header": 42,
+          "cards": 881,
+          "thumbs": 1763,
+          "cardCount": 20,
+          "afterReqs": 4,
+          "afterKB": 7,
+          "afterApi": 1,
+          "afterThumbNet": 1,
+          "cpu": 16.3
+        },
+        {
+          "blank": 0,
+          "header": 48,
+          "cards": 868,
+          "thumbs": 1787,
+          "cardCount": 20,
+          "afterReqs": 4,
+          "afterKB": 7,
+          "afterApi": 1,
+          "afterThumbNet": 1,
+          "cpu": 15.4
+        },
+        {
+          "blank": 0,
+          "header": 31,
+          "cards": 838,
+          "thumbs": 1785,
+          "cardCount": 20,
+          "afterReqs": 4,
+          "afterKB": 7,
+          "afterApi": 1,
+          "afterThumbNet": 1,
+          "cpu": 13.9
+        },
+        {
+          "blank": 0,
+          "header": 16,
+          "cards": 845,
+          "thumbs": 1764,
+          "cardCount": 20,
+          "afterReqs": 4,
+          "afterKB": 7,
+          "afterApi": 1,
+          "afterThumbNet": 1,
+          "cpu": 14.5
+        },
+        {
+          "blank": 0,
+          "header": 23,
+          "cards": 809,
+          "thumbs": 1737,
+          "cardCount": 20,
+          "afterReqs": 4,
+          "afterKB": 7,
+          "afterApi": 1,
+          "afterThumbNet": 1,
+          "cpu": 13.8
+        }
+      ],
+      "nav-early L": [
+        {
+          "blank": 0,
+          "header": 26,
+          "cards": 390,
+          "thumbs": 390,
+          "cardCount": 20,
+          "afterReqs": 1,
+          "afterKB": 0,
+          "afterApi": 0,
+          "afterThumbNet": 0,
+          "cpu": 14.1
+        },
+        {
+          "blank": 0,
+          "header": 23,
+          "cards": 398,
+          "thumbs": 398,
+          "cardCount": 20,
+          "afterReqs": 1,
+          "afterKB": 0,
+          "afterApi": 0,
+          "afterThumbNet": 0,
+          "cpu": 15
+        },
+        {
+          "blank": 0,
+          "header": 39,
+          "cards": 331,
+          "thumbs": 331,
+          "cardCount": 20,
+          "afterReqs": 1,
+          "afterKB": 0,
+          "afterApi": 0,
+          "afterThumbNet": 0,
+          "cpu": 14.3
+        },
+        {
+          "blank": 0,
+          "header": 34,
+          "cards": 143,
+          "thumbs": 143,
+          "cardCount": 20,
+          "afterReqs": 1,
+          "afterKB": 0,
+          "afterApi": 0,
+          "afterThumbNet": 0,
+          "cpu": 13.8
+        },
+        {
+          "blank": 0,
+          "header": 38,
+          "cards": 326,
+          "thumbs": 326,
+          "cardCount": 20,
+          "afterReqs": 1,
+          "afterKB": 0,
+          "afterApi": 0,
+          "afterThumbNet": 0,
+          "cpu": 13.5
+        }
+      ]
+    },
+    "summary": {
+      "nav-first A": {
+        "blank": "0 (0–0)",
+        "header": "75 (29–77)",
+        "cards": "740 (681–755)",
+        "thumbs": "1329 (1308–1377)",
+        "cardCount": "20 (20–20)",
+        "afterReqs": "5 (5–5)",
+        "afterKB": "7 (7–7)",
+        "afterApi": "1 (1–1)",
+        "afterThumbNet": "1 (1–1)",
+        "cpu": "13.1 (12.5–17.5)"
+      },
+      "nav-first L": {
+        "blank": "0 (0–0)",
+        "header": "80 (79–92)",
+        "cards": "740 (735–819)",
+        "thumbs": "1328 (1304–1343)",
+        "cardCount": "20 (20–20)",
+        "afterReqs": "5 (5–5)",
+        "afterKB": "7 (7–7)",
+        "afterApi": "1 (1–1)",
+        "afterThumbNet": "1 (1–1)",
+        "cpu": "13.1 (12.1–15.7)"
+      },
+      "nav-early A": {
+        "blank": "0 (0–0)",
+        "header": "31 (16–48)",
+        "cards": "845 (809–881)",
+        "thumbs": "1764 (1737–1787)",
+        "cardCount": "20 (20–20)",
+        "afterReqs": "4 (4–4)",
+        "afterKB": "7 (7–7)",
+        "afterApi": "1 (1–1)",
+        "afterThumbNet": "1 (1–1)",
+        "cpu": "14.5 (13.8–16.3)"
+      },
+      "nav-early L": {
+        "blank": "0 (0–0)",
+        "header": "34 (23–39)",
+        "cards": "331 (143–398)",
+        "thumbs": "331 (143–398)",
+        "cardCount": "20 (20–20)",
+        "afterReqs": "1 (1–1)",
+        "afterKB": "0 (0–0)",
+        "afterApi": "0 (0–0)",
+        "afterThumbNet": "0 (0–0)",
+        "cpu": "14.1 (13.5–15)"
+      }
+    }
+  },
+  "lobbyCold": {
+    "hostCpu": 13.2,
+    "results": {
+      "lobby-cold A": [
+        {
+          "fcp": 1712,
+          "lobby": 2773,
+          "rooms": 3604,
+          "roomsApiStart": 2802,
+          "roomsApiEnd": 3413,
+          "coursesApiStart": null,
+          "kb": 669,
+          "reqs": 57,
+          "errors": 0,
+          "cpu": 16.5
+        },
+        {
+          "fcp": 1720,
+          "lobby": 2768,
+          "rooms": 3532,
+          "roomsApiStart": 2789,
+          "roomsApiEnd": 3405,
+          "coursesApiStart": null,
+          "kb": 669,
+          "reqs": 57,
+          "errors": 0,
+          "cpu": 12.7
+        },
+        {
+          "fcp": 1704,
+          "lobby": 2761,
+          "rooms": 3524,
+          "roomsApiStart": 2784,
+          "roomsApiEnd": 3408,
+          "coursesApiStart": null,
+          "kb": 669,
+          "reqs": 57,
+          "errors": 0,
+          "cpu": 13.8
+        },
+        {
+          "fcp": 1720,
+          "lobby": 2760,
+          "rooms": 3594,
+          "roomsApiStart": 2782,
+          "roomsApiEnd": 3404,
+          "coursesApiStart": null,
+          "kb": 669,
+          "reqs": 57,
+          "errors": 0,
+          "cpu": 12.6
+        },
+        {
+          "fcp": 1700,
+          "lobby": 2764,
+          "rooms": 3639,
+          "roomsApiStart": 2784,
+          "roomsApiEnd": 3408,
+          "coursesApiStart": null,
+          "kb": 669,
+          "reqs": 57,
+          "errors": 0,
+          "cpu": 12.6
+        }
+      ],
+      "lobby-cold L": [
+        {
+          "fcp": 1724,
+          "lobby": 2814,
+          "rooms": 3706,
+          "roomsApiStart": 2840,
+          "roomsApiEnd": 3435,
+          "coursesApiStart": 641,
+          "kb": 677,
+          "reqs": 60,
+          "errors": 0,
+          "cpu": 13
+        },
+        {
+          "fcp": 1724,
+          "lobby": 2813,
+          "rooms": 3622,
+          "roomsApiStart": 2834,
+          "roomsApiEnd": 3438,
+          "coursesApiStart": 629,
+          "kb": 677,
+          "reqs": 60,
+          "errors": 0,
+          "cpu": 12.5
+        },
+        {
+          "fcp": 1724,
+          "lobby": 2805,
+          "rooms": 3608,
+          "roomsApiStart": 2828,
+          "roomsApiEnd": 3424,
+          "coursesApiStart": 636,
+          "kb": 677,
+          "reqs": 60,
+          "errors": 0,
+          "cpu": 13.5
+        },
+        {
+          "fcp": 1724,
+          "lobby": 2822,
+          "rooms": 3616,
+          "roomsApiStart": 2844,
+          "roomsApiEnd": 3447,
+          "coursesApiStart": 625,
+          "kb": 677,
+          "reqs": 60,
+          "errors": 0,
+          "cpu": 11.7
+        },
+        {
+          "fcp": 1772,
+          "lobby": 2857,
+          "rooms": 3687,
+          "roomsApiStart": 2879,
+          "roomsApiEnd": 3473,
+          "coursesApiStart": 635,
+          "kb": 677,
+          "reqs": 60,
+          "errors": 0,
+          "cpu": 13.2
+        }
+      ]
+    },
+    "summary": {
+      "lobby-cold A": {
+        "fcp": "1712 (1700–1720)",
+        "lobby": "2764 (2760–2773)",
+        "rooms": "3594 (3524–3639)",
+        "roomsApiStart": "2784 (2782–2802)",
+        "roomsApiEnd": "3408 (3404–3413)",
+        "kb": "669 (669–669)",
+        "reqs": "57 (57–57)",
+        "errors": "0 (0–0)",
+        "cpu": "12.7 (12.6–16.5)"
+      },
+      "lobby-cold L": {
+        "fcp": "1724 (1724–1772)",
+        "lobby": "2814 (2805–2857)",
+        "rooms": "3622 (3608–3706)",
+        "roomsApiStart": "2840 (2828–2879)",
+        "roomsApiEnd": "3438 (3424–3473)",
+        "coursesApiStart": "635 (625–641)",
+        "kb": "677 (677–677)",
+        "reqs": "60 (60–60)",
+        "errors": "0 (0–0)",
+        "cpu": "13 (11.7–13.5)"
+      }
+    }
+  }
+}
