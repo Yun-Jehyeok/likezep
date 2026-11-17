@@ -9,7 +9,7 @@ import tailwindcss from "@tailwindcss/vite";
  * cold 진입은 MF 체인(remoteEntry → 런타임 → 공유 모듈 맵 → pendingShares → 첫 렌더 → loadRemote → remote 청크)이
  * 순차로 진행된다. shell 자기 청크 중 동적 import라 Vite가 index.html modulepreload에 넣지 않는 두 개를 처리한다.
  * - pendingShares: 모든 경로의 host 초기화에 쓰인다 → 모든 페이지 <head>에 modulepreload
- * - learn loadRemote 청크: /learn에서만 필요 → index.html 인라인 스크립트의 자리표시자(__MF_LEARN_LOADER__)에 경로를 넣는다
+ * - learn loadRemote 청크: /learn과 /lobby(강의실 미리 받기, §5.1 ②)에서만 필요 → index.html 인라인 스크립트의 자리표시자(__MF_LEARN_LOADER__)에 경로를 넣는다
  * remote(learn·room) 파일은 그 인라인 스크립트가 각 remote의 mf-manifest.json을 읽어 미리 받는다.
  * 청크를 못 찾으면 경고만 하고 넘어간다(미리 받기만 빠지고 동작은 같다).
  */

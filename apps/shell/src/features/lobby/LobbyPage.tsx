@@ -45,7 +45,8 @@ export function LobbyPage() {
         return () => clearInterval(interval);
     }, []);
 
-    // 룸 목록이 그려진 뒤 브라우저가 한가할 때 강의실(learn remote)을 미리 받는다 (P3b, app/remotes.ts)
+    // 룸 목록이 그려진 뒤 브라우저가 한가할 때 강의실(learn remote)을 미리 받아 실행해 둔다 (P3b, app/remotes.ts)
+    // 하드 내비게이션으로 /lobby에 들어왔으면 파일은 index.html 인라인 스크립트가 이미 받아 두었고(§5.1 ②), 여기서는 실행만 한다
     useEffect(() => {
         if (loading) return;
         return schedulePreloadLearn();

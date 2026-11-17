@@ -67,7 +67,10 @@
         <script>
             // MF 체인 미리 받기 — remote 쪽 (강의실 성능 P3 ③, docs/plans/learn-performance.md)
             // cold 진입은 MF 파일을 "앞 파일을 실행해야 다음 주소를 아는" 순서로 받아 단계마다 왕복이 쌓인다.
-            // 로그인 상태로 /learn에 들어오면 각 remote의 mf-manifest.json을 받아 그 파일들을 한꺼번에 미리 받는다.
+            // 로그인 상태로 /learn 또는 /lobby에 들어오면 각 remote의 mf-manifest.json을 받아 그 파일들을 한꺼번에 미리 받는다.
+            // - /lobby (§5.1 ②): 로비 진입 직후 강의실을 눌러도 learn 청크가 이미 받아져 있게 HTML 단계에서 받는다.
+            //   learn 청크는 원래도 로비가 한가할 때 받았다(LobbyPage schedulePreloadLearn) — 바뀌는 건 받는 시점.
+            //   host 초기화(room·learn 런타임)도 /learn처럼 병렬이 된다. 데이터 절약 모드(Save-Data)면 로비에서는 하지 않는다
             // - learn: expose App의 sync JS + async 중 공유 모듈 연결 청크(__loadShare__) + CSS
             //   (async의 나머지는 react 등 공유 모듈의 대체본이라 shell이 공유하면 쓰이지 않는다. modulepreload는 import한 파일을
             //   따라 받지 않으므로 필요한 파일을 목록으로 지정해야 한다 — Chrome 확인 2026-11-16)
@@ -78,7 +81,10 @@
             (function () {
                 try {
                     if (!localStorage.getItem("auth_token")) return;
-                    if (!/^\/learn(\/|$)/.test(location.pathname)) return;
+                    var onLearn = /^\/learn(\/|$)/.test(location.pathname);
+                    var onLobby = /^\/lobby\/?$/.test(location.pathname);
+                    if (!onLearn && !onLobby) return;
+                    if (onLobby && navigator.connection && navigator.connection.saveData) return;
                     var head = document.head;
                     var add = function (rel, href, as) {
                         var l = document.createElement("link");
