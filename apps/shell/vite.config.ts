@@ -35,6 +35,45 @@ function mfChainPreload(): Plugin {
     };
 }
 
+/**
+ * shell CSS를 HTML에 인라인 (강의실 성능 §5.1 ⑤, docs/plans/learn-performance.md)
+ *
+ * Vite는 entry CSS(src/index.css — Tailwind)를 <head>의 <link rel=stylesheet>로 넣는다. 이 링크는 렌더 차단이라
+ * 첫 화면(index.html의 정적 뼈대)이 CSS 도착까지 기다리고, 뒤의 module script 실행도 CSS를 기다린다.
+ * cold에서는 이 CSS가 MF 미리 받기 20여 개와 회선을 다퉈 약 1.64s에 끝났다(FCP 1.7s).
+ * 전체가 작아서(약 18KB, brotli 약 4KB) 같은 자리에 <style>로 바꿔 넣는다 → 뼈대는 HTML만 받으면 그려진다.
+ * - 뼈대에 필요한 부분만 넣지 않는 이유: 뼈대와 실제 화면이 같은 Tailwind 클래스를 쓴다. 일부만 넣으면 나머지를
+ *   비동기로 받아야 하고, React가 그 전에 그리면 스타일 없는 화면이 잠깐 보인다. 전체를 넣으면 CSS를 두 벌 관리할 일도 없다
+ * - HTML은 no-cache + ETag라 재방문은 304로 본문을 다시 받지 않는다. CSS가 따로 1년 캐시되던 이점은 없어진다
+ * - CSS 파일은 그대로 내보낸다(HTML 참조만 없앰)
+ * - 못 찾으면 경고만 하고 링크를 그대로 둔다(지금과 같은 동작)
+ */
+function inlineEntryCss(): Plugin {
+    return {
+        name: "likezep-inline-entry-css",
+        apply: "build",
+        transformIndexHtml: {
+            order: "post",
+            handler(html, ctx) {
+                const bundle = ctx.bundle ?? {};
+                let inlined = 0;
+                const out = html.replace(/<link\b[^>]*\brel="stylesheet"[^>]*\bhref="\/(assets\/[^"]+\.css)"[^>]*>/g, (tag, file: string) => {
+                    const asset = bundle[file];
+                    const css = asset?.type === "asset" ? (typeof asset.source === "string" ? asset.source : new TextDecoder().decode(asset.source)) : null;
+                    if (!css || /<\/style/i.test(css)) {
+                        console.warn(`[inline-entry-css] ${file}를 인라인하지 못함 — <link> 유지`);
+                        return tag;
+                    }
+                    inlined++;
+                    return `<style data-from="${file}">${css}</style>`;
+                });
+                if (!inlined) console.warn("[inline-entry-css] 인라인할 entry CSS 링크를 찾지 못함");
+                return out;
+            },
+        },
+    };
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ command }) => ({
     server: { port: 5173 },
@@ -68,5 +107,6 @@ export default defineConfig(({ command }) => ({
             },
         }),
         mfChainPreload(),
+        inlineEntryCss(),
     ],
 }));
