@@ -11,6 +11,10 @@ import { createApiClient } from "@mentoring/ui";
  * - window.__likezepPrefetch[API 경로] = { at: 요청 시각(ms), promise: 응답 JSON }
  * - learn은 한 번 꺼내면 지운다. 없거나 오래됐거나 실패했으면 직접 요청한다
  * - @mentoring/ui(shared)에 넣지 않은 이유: shell·learn 배포 순서가 어긋나도 깨지지 않게 (없으면 그냥 직접 요청)
+ *
+ * /learn 하드 내비게이션(첫 진입·재방문)은 index.html <head> 인라인 스크립트가 HTML 단계에서 같은 항목을 먼저 등록한다
+ * (§5.1 ①). 그 경우 아래 prefetchApi는 DEDUPE_MS 안이라 건너뛰고, 썸네일도 인라인 스크립트가 받는다.
+ * 여기는 로비 → 강의실 같은 SPA 이동을 맡는다. 요청 모양·썸네일 어림을 바꾸면 인라인 스크립트도 같이 고칠 것.
  */
 export interface PrefetchEntry {
     at: number;
@@ -55,7 +59,7 @@ export const LEARN_LIST_API = "/api/courses";
  * 몇 장 받을지: learn CourseListPage 레이아웃(grid-cols-1 / sm:2 / lg:3)으로 뷰포트에 들어올 카드 수를 어림한다.
  * 실측(2026-11-16): 첫 줄 위치 1280px 폭 234px / 412px 폭 276px(칩이 여러 줄), 줄 간격 311px.
  * 화면 밖 썸네일까지 받으면 첫 화면 썸네일과 회선을 나눠 쓴다.
- * ⚠ CourseListPage 레이아웃을 바꾸면 아래 상수도 맞춘다.
+ * ⚠ CourseListPage 레이아웃을 바꾸면 아래 상수와 index.html 인라인 스크립트의 같은 어림을 함께 맞춘다.
  */
 const CARD_ROW_HEIGHT = 311;
 const FIRST_ROW_TOP = 240;
