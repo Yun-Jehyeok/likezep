@@ -6,6 +6,65 @@
         <title>멘토링 플랫폼</title>
         <!-- Pretendard는 자체 호스팅한다 (src/fonts/pretendard.css를 main.tsx가 렌더를 막지 않게 <link>로 붙인다) -->
         <script>
+            // 강의 목록 API·첫 화면 썸네일 선행 요청 — HTML 단계 (강의실 성능 §5.1 ①, docs/plans/learn-performance.md)
+            // shell 첫 렌더(감속 cold 약 2.7s, warm 약 1.4s)를 기다리지 않고 HTML을 받자마자 /api/courses를 보낸다.
+            // - 계약은 apps/shell/src/app/prefetch.ts와 같다: window.__likezepPrefetch["/api/courses"] = { at, promise }
+            //   learn(apps/learn/src/prefetch.ts)이 꺼내 쓰고, shell prefetchApi는 10초 안 같은 경로면 다시 요청하지 않는다
+            // - 요청 모양(헤더·실패 처리)은 @mentoring/ui createApiClient와, 썸네일 장수 어림은 prefetch.ts preloadListThumbnails와 맞춘다
+            //   (둘 중 하나를 바꾸면 여기도 고칠 것)
+            // - API 주소는 빌드 때 Vite가 HTML의 env 자리표시자를 VITE_API_URL 값으로 바꾼다. 못 바꿨으면 건너뛴다
+            // - 실패해도 learn이 직접 요청하므로 동작은 같다
+            (function () {
+                try {
+                    var token = localStorage.getItem("auth_token");
+                    if (!token) return;
+                    if (!/^\/learn\/?$/.test(location.pathname)) return;
+                    var api = "%VITE_API_URL%";
+                    if (!/^https?:\/\//.test(api)) return;
+                    try {
+                        // 만료된 토큰이면 요청하지 않는다 (App.tsx가 로그아웃시킨다)
+                        var exp = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).exp;
+                        if (exp && Date.now() / 1000 >= exp) return;
+                    } catch (e) {
+                        /* 해석 못 하면 그냥 요청 (만료면 401 → learn이 직접 요청) */
+                    }
+                    var path = "/api/courses";
+                    var promise = fetch(api + path, {
+                        method: "GET",
+                        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+                    }).then(function (r) {
+                        if (!r.ok) throw new Error("prefetch " + r.status);
+                        return r.json();
+                    });
+                    promise.catch(function () {}); // 꺼내 쓰지 않고 실패해도 unhandled rejection이 남지 않게
+                    (window.__likezepPrefetch = window.__likezepPrefetch || {})[path] = { at: Date.now(), promise: promise };
+                    promise.then(function (list) {
+                        if (!Array.isArray(list)) return;
+                        // 첫 화면 카드 수 어림: learn CourseListPage grid-cols-1 / sm:2 / lg:3, 첫 줄 240px, 줄 간격 311px
+                        var w = window.innerWidth;
+                        var n = (w >= 1024 ? 3 : w >= 640 ? 2 : 1) * Math.max(1, Math.ceil((window.innerHeight - 240) / 311));
+                        var seen = {};
+                        var keep = []; // GC로 요청이 끊기지 않게 잠시 붙잡아 둔다
+                        list.slice(0, n).forEach(function (c) {
+                            var u = c && c.thumbnail;
+                            if (typeof u !== "string" || !u || seen[u]) return;
+                            seen[u] = 1;
+                            var img = new Image(); // learn <img>와 같은 CORS 모드(속성 없음) → 같은 문서에서 재사용
+                            img.setAttribute("fetchpriority", "high");
+                            img.decoding = "async";
+                            img.src = u;
+                            keep.push(img);
+                        });
+                        setTimeout(function () {
+                            keep.length = 0;
+                        }, 30000);
+                    }, function () {});
+                } catch (e) {
+                    /* 선행 요청은 없어도 된다 */
+                }
+            })();
+        </script>
+        <script>
             // MF 체인 미리 받기 — remote 쪽 (강의실 성능 P3 ③, docs/plans/learn-performance.md)
             // cold 진입은 MF 파일을 "앞 파일을 실행해야 다음 주소를 아는" 순서로 받아 단계마다 왕복이 쌓인다.
             // 로그인 상태로 /learn에 들어오면 각 remote의 mf-manifest.json을 받아 그 파일들을 한꺼번에 미리 받는다.
