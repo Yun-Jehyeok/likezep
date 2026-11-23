@@ -12,13 +12,24 @@ package-lock.json
 *.log
 _*.log
 
-# Claude Code 내부 파일
-.claude/
+# Claude Code — 하네스 설정만 추적 (저장소가 공개라 범위를 좁게, 결정 로그 2026-11-23)
+# 로컬 전용: settings.local.json, commands/, logs/, worktrees/, agent-memory-local/
+.claude/*
+!.claude/settings.json
+!.claude/agents/
+!.claude/hooks/
+!.claude/rules/
+!.claude/skills/
+!.claude/agent-memory/
 
-# 문서 (README.md만 예외)
+# 문서 (README.md와 위 하네스 문서만 예외. docs/는 로컬 전용)
 docs/
 *.md
 !/README.md
+!.claude/agents/**/*.md
+!.claude/rules/**/*.md
+!.claude/skills/**/*.md
+!.claude/agent-memory/**/*.md
 
 # Prisma
 prisma/migrations/*.sql.bak
@@ -50,6 +61,8 @@ e2e/ad-hoc/
 work/*.png
 work/*.log
 work/tasks/*/screenshots/
+# 로컬 백업 (settings.local.json 등 자격 증명이 섞일 수 있음 — 커밋 금지)
+work/archive/
 
 # Module Federation 자동 생성 진단 파일
 **/.mf/
